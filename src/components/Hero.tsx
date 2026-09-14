@@ -29,7 +29,6 @@ const SLIDES = [
   {
     image: '/images/hero-stadium.webp',
     alt: 'ملعب قديم',
-    badge: 'منذ 2016',
     title: 'أكثر من 12,000 قميص أصلي',
     highlight: 'موثّق قطعة قطعة',
     desc: 'متجر عربي متخصص في الأقمصة الرياضية الفينتاج من الستينات حتى التسعينات، مع فحص معتمد 21 نقطة.',
@@ -85,7 +84,7 @@ export default function Hero({ count }: { count: number }) {
               decoding="async"
               className="absolute inset-0 w-full h-full object-cover opacity-50"
             />
-            <div className="absolute inset-0 " />
+            <div className="absolute inset-0 " /> 
             <div className="absolute inset-0 " />
 
             <div className="relative h-full flex items-center">
@@ -111,7 +110,7 @@ export default function Hero({ count }: { count: number }) {
                   <a href="#story" className="border-2 border-[#f5f9fe]/30 hover:border-[#bfe1f8] hover:text-[#bfe1f8] font-black px-7 py-3.5 rounded-full text-[15px] transition-all">قصتنا</a>
                 </div>
 
-                {s.caption ? (
+                {s.caption && (
                   <div className="flex items-center gap-2 bg-[#f5f9fe] text-[#0f2f52] rounded-2xl px-4 py-3 shadow-xl w-fit -rotate-1">
                     <ShieldCheck size={22} className="text-[#1d6fd1] shrink-0" />
                     <div className="text-xs font-black">
@@ -119,20 +118,7 @@ export default function Hero({ count }: { count: number }) {
                       <div className="font-bold text-[#0f2f52]/60">{s.captionSub}</div>
                     </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3 max-w-md">
-                    {[
-                      { n: '+12K', t: 'عميل سعيد' },
-                      { n: '4.9', t: 'متوسط التقييم', star: true },
-                      { n: '100%', t: 'أصلي موثّق' },
-                    ].map((st) => (
-                      <div key={st.t} className="bg-[#f5f9fe]/8 border border-[#f5f9fe]/15 rounded-2xl p-3 text-center backdrop-blur">
-                        <div className="font-black text-xl md:text-2xl text-[#bfe1f8] flex items-center justify-center gap-1">{st.n}{st.star && <Star size={16} className="fill-[#bfe1f8]" />}</div>
-                        <div className="text-[12px] font-bold text-[#f5f9fe]/70">{st.t}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                )}    
               </div>
             </div>
           </div>

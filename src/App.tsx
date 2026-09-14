@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { ShopProvider } from './store/ShopContext';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import CategoryCarousel from './components/CategoryCarousel';
 import Ticker from './components/Ticker';
 import ShopSection from './components/ShopSection';
 import Footer from './components/Footer';
@@ -33,6 +34,7 @@ function Site() {
       <Navbar onSearch={setSearch} />
       <Hero count={items.length} />
       <Ticker />
+      <CategoryCarousel />
 
       {featured.length > 0 && (
         <Reveal as="section" effect="fade-up" className="bg-[#f5f9fe] pt-10 md:pt-14">
