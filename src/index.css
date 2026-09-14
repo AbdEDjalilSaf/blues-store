@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root {
+  --cream: #f5f9fe;
+  --ink: #0f2f52;
+  --gold: #2f9de4;
+  --wine: #1565c0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Cairo', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+::selection { background: #2f9de4; color: #0f2f52; }
+
+::-webkit-scrollbar { width: 10px; height: 8px; }
+::-webkit-scrollbar-track { background: #dbe7f5; }
+::-webkit-scrollbar-thumb { background: #0f2f52; border-radius: 99px; border: 2px solid #dbe7f5; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(50%); }
+}
+
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heroSlideIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+img { user-select: none; }
+
+img[src$=".webp"] { background-color: #dbe7f5; }
