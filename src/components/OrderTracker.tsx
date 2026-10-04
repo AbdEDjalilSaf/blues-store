@@ -11,10 +11,13 @@ export default function OrderTracker() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
-  const track = (e: React.FormEvent) => {
+  const track = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone.trim()) { setErr('أدخل رقم الجوال المستخدم في الطلب'); return; }
     setLoading(true); setErr('');
+    // Yield a frame so the spinner actually paints before the (synchronous)
+    // localStorage read blocks the main thread.
+    await new Promise((r) => requestAnimationFrame(r));
     const data = getOrdersByPhone(phone.trim());
     setOrders(data);
     if (data.length === 0) setErr('لم نجد طلبات بهذا الرقم — تأكد من الرقم أو تواصل معنا');
@@ -22,12 +25,15 @@ export default function OrderTracker() {
   };
 
   return (
-    <section id="track" className="bg-[#f5f9fe] pb-12 md:pb-20 scroll-mt-20">
+    <section id="track" className="bg-[#f5f9fe] pb-12 md:pb-20 scroll-mt-20" aria-labelledby="track-heading">
       <div className="max-w-4xl mx-auto px-4 md:px-6">
         <div className="bg-[#0f2f52] rounded-[28px] p-6 md:p-10 text-[#f5f9fe] relative overflow-hidden">
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#bfe1f8 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
           <div className="relative">
-            <div className="flex items-center gap-3 mb-2"><span className="w-11 h-11 rounded-2xl bg-[#2f9de4] text-[#0f2f52] grid place-items-center"><PackageCheck size={22} /></span><h2 className="font-black text-2xl md:text-3xl">تتبع طلبك</h2></div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="w-11 h-11 rounded-2xl bg-[#2f9de4] text-[#0f2f52] grid place-items-center"><PackageCheck size={22} /></span>
+              <h2 id="track-heading" className="font-black text-2xl md:text-3xl">تتبع طلبك</h2>
+            </div>
             <p className="text-[#f5f9fe]/60 font-bold text-sm mb-5">أدخل رقم جوالك لعرض حالة طلباتك لحظة بلحظة</p>
             <form onSubmit={track} className="flex flex-col sm:flex-row gap-2 mb-2">
               <div className="flex-1 flex items-center gap-2 bg-white/10 border-2 border-white/15 focus-within:border-[#2f9de4] rounded-2xl px-4 py-3">

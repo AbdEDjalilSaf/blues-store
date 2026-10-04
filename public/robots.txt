@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Build artefacts and preview tooling carry no crawlable value.
+Disallow: /assets/
+Disallow: /arena-preview.js
+
+Sitemap: https://bluescity.store/sitemap.xml

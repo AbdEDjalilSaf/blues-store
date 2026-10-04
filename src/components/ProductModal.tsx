@@ -1,28 +1,43 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { BadgeCheck, Heart, Minus, Plus, Ruler, ShoppingBag, Star, Truck, X } from 'lucide-react';
 import { formatPrice, parseSizes, type Product, type Review } from '../lib/api';
 import { loadReviews, saveReview } from '../lib/catalog';
-import { useShop } from '../store/ShopContext';
+import { useShopActions, useWishlist } from '../store/shop';
 
-export default function ProductModal({ p, onClose }: { p: Product | null; onClose: () => void }) {
-  const { addToCart, setCartOpen, toggleWish, wishlist, showToast } = useShop();
+interface Props {
+  p: Product;
+  onClose: () => void;
+}
+
+/**
+ * Mounted only while a product is open (see `App`), and remounted via
+ * `key={product.id}`, so the per-product state below initialises fresh without
+ * a reset effect.
+ */
+export default function ProductModal({ p, onClose }: Props) {
+  const { addToCart, setCartOpen, toggleWish, showToast } = useShopActions();
+  const wishlist = useWishlist();
   const [size, setSize] = useState('');
   const [qty, setQty] = useState(1);
   const [sizeErr, setSizeErr] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<Review[]>(() => loadReviews(p.id));
   const [form, setForm] = useState({ author: '', rating: 5, text: '' });
   const [sending, setSending] = useState(false);
+  const panel = useRef<HTMLDivElement | null>(null);
 
+  // Scroll lock + Escape to close. Pure external-system work, no setState.
   useEffect(() => {
-    setSize(''); setQty(1); setSizeErr(false);
-    if (p) {
-      setReviews(loadReviews(p.id));
-      document.body.style.overflow = 'hidden';
-    } else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
-  }, [p]);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    panel.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
 
-  if (!p) return null;
   const sizes = parseSizes(p.sizes);
   const wished = wishlist.includes(p.id);
   const discount = p.old_price ? Math.round((1 - Number(p.price) / Number(p.old_price)) * 100) : 0;
@@ -34,7 +49,7 @@ export default function ProductModal({ p, onClose }: { p: Product | null; onClos
     setCartOpen(true);
   };
 
-  const sendReview = async (e: React.FormEvent) => {
+  const sendReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.author.trim() || !form.text.trim()) { showToast('فضلاً أكمل اسمك وتقييمك'); return; }
     setSending(true);
@@ -43,14 +58,21 @@ export default function ProductModal({ p, onClose }: { p: Product | null; onClos
       setReviews((prev) => [r, ...prev]);
       setForm({ author: '', rating: 5, text: '' });
       showToast('شكراً! تم نشر تقييمك');
-    } catch { showToast('تعذر إرسال التقييم، حاول لاحقاً'); }
-    finally { setSending(false); }
+    } catch {
+      showToast('تعذر إرسال التقييم، حاول لاحقاً');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={p.name_ar}>
       <div className="absolute inset-0 bg-[#0f2f52]/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#f5f9fe] w-full max-w-4xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl">
+      <div
+        ref={panel}
+        tabIndex={-1}
+        className="relative bg-[#f5f9fe] w-full max-w-4xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl outline-none"
+      >
         <button onClick={onClose} className="absolute top-3 left-3 z-10 w-10 h-10 grid place-items-center rounded-full bg-[#0f2f52] text-white hover:bg-[#1565c0]" aria-label="إغلاق"><X size={20} /></button>
         <div className="grid md:grid-cols-2">
           <div className="relative bg-[#e7eff8] p-4 md:p-6">

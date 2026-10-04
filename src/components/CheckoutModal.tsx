@@ -1,13 +1,14 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { BadgeCheck, Banknote, CheckCircle2, CreditCard, Loader2, MapPin, Phone, User, Wallet, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import { saveOrder } from '../lib/catalog';
-import { useShop } from '../store/ShopContext';
+import { useCart, useShopActions } from '../store/shop';
 
 const CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'أبها', 'تبوك', 'بريدة', 'خميس مشيط', 'حائل', 'جازان', 'نجران', 'ينبع', 'الطائف', 'أخرى'];
 
 export default function CheckoutModal({ open, onClose }: { open: boolean; onClose: (orderId?: number) => void }) {
-  const { cart, subtotal, clearCart, showToast } = useShop();
+  const { cart, subtotal } = useCart();
+  const { clearCart, showToast } = useShopActions();
   const [form, setForm] = useState({ name: '', phone: '', city: 'الرياض', address: '', notes: '', pay: 'عند الاستلام' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
@@ -50,15 +51,15 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
       });
       setDoneId(order.id);
       clearCart();
-    } catch (err: any) {
-      showToast(err.message || 'تعذر إتمام الطلب، حاول لاحقاً');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'تعذر إتمام الطلب، حاول لاحقاً');
     } finally { setSending(false); }
   };
 
   const closeAll = () => { setDoneId(null); onClose(doneId || undefined); };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-label="إتمام الطلب">
       <div className="absolute inset-0 bg-[#0f2f52]/75 backdrop-blur-sm" onClick={closeAll} />
       <div className="relative bg-[#f5f9fe] w-full max-w-2xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl">
         {doneId ? (

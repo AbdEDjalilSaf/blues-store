@@ -35,13 +35,22 @@ export interface Review {
   created_at: string;
 }
 
+export interface OrderLine {
+  product_id: number;
+  name: string;
+  size: string;
+  qty: number;
+  price: number;
+  image: string;
+}
+
 export interface Order {
   id: number;
   customer_name: string;
   phone: string;
   city: string;
   address: string;
-  items: any[];
+  items: OrderLine[];
   total: number;
   status: string;
   created_at: string;

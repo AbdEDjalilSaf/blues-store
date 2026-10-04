@@ -6,7 +6,12 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    // Verbatim vendor/preview tooling, not part of the app source.
+    'public/arena-preview.js',
+    '.vite-source-tags.js',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

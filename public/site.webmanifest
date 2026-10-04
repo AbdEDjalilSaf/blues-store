@@ -1,0 +1,28 @@
+{
+  "name": "بلوز سيتي — متجر الأقمصة الرياضية الفينتاج",
+  "short_name": "بلوز سيتي",
+  "description": "متجر عربي متخصص في الأقمصة الرياضية الفينتاج الأصلية من الستينات حتى التسعينات، مع فحص معتمد وشهادة أصالة.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f9fe",
+  "theme_color": "#0f2f52",
+  "categories": ["shopping", "sports"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/logoNew.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

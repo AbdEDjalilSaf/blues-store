@@ -1,35 +1,47 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async () => {
   const plugins = [react(), tailwindcss()];
   try {
-    // @ts-ignore
+    // @ts-expect-error - optional dev-only plugin, absent in trimmed installs
     const m = await import('./.vite-source-tags.js');
     plugins.push(m.sourceTags());
-  } catch {}
-
-  const env = loadEnv(mode, process.cwd(), ['VITE_', 'NEXT_PUBLIC_']);
-  const processEnvDefines: Record<string, string> = {};
-  for (const [key, value] of Object.entries(env)) {
-    processEnvDefines[`process.env.${key}`] = JSON.stringify(value);
+  } catch {
+    // Element-picker source tags are a preview-only convenience.
   }
 
   return {
     plugins,
-    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
-    define: processEnvDefines,
     build: {
-      target: 'es2020',
+      // es2022 lets esbuild drop the downlevelling helpers for optional
+      // chaining / nullish coalescing that this codebase uses heavily.
+      target: 'es2022',
       cssMinify: true,
-      chunkSizeWarningLimit: 600,
+      cssCodeSplit: true,
+      assetsInlineLimit: 2048,
+      reportCompressedSize: true,
+      chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            icons: ['lucide-react'],
+          /**
+           * Only the framework runtime is pinned. `lucide-react` is deliberately
+           * NOT listed here: naming the package as a manual chunk pulled its
+           * full icon barrel into the graph and defeated tree-shaking. Icons
+           * are now split per-import by Rollup and land in the chunk that uses
+           * them.
+           */
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+                return 'react-vendor';
+              }
+              // Shared, low-frequency helpers used by more than one lazy chunk.
+              if (id.includes('node_modules/lucide-react')) return 'icons';
+            }
+            return undefined;
           },
         },
       },

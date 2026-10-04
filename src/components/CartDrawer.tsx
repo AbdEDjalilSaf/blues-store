@@ -1,17 +1,18 @@
-import { ArrowLeft, Minus, Plus, ShieldCheck, ShoppingBag, Trash2, Truck, X } from 'lucide-react';
+﻿import { ArrowLeft, Minus, Plus, ShieldCheck, ShoppingBag, Trash2, Truck, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
-import { useShop } from '../store/ShopContext';
+import { useCart, useShopActions } from '../store/shop';
 
 export default function CartDrawer({ onCheckout }: { onCheckout: () => void }) {
-  const { cart, cartOpen, setCartOpen, updateQty, removeFromCart, subtotal, cartCount } = useShop();
+  const { cart, cartOpen, subtotal, cartCount } = useCart();
+  const { setCartOpen, updateQty, removeFromCart } = useShopActions();
   const shipping = subtotal >= 300 || subtotal === 0 ? 0 : 25;
   const total = subtotal + shipping;
 
   if (!cartOpen) return null;
   return (
-    <div className="fixed inset-0 z-[85]" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-[85]" role="dialog" aria-modal="true" aria-label="سلة المقتنيات">
       <div className="absolute inset-0 bg-[#0f2f52]/70 backdrop-blur-sm" onClick={() => setCartOpen(false)} />
-      <aside className="absolute top-0 bottom-0 left-0 w-full max-w-md bg-[#f5f9fe] shadow-2xl flex flex-col">
+      <aside className="absolute top-0 bottom-0 left-0 w-full max-w-md bg-[#f5f9fe] shadow-2xl flex flex-col" aria-label="سلة المقتنيات">
         <div className="bg-[#0f2f52] text-[#f5f9fe] p-5 flex items-center justify-between">
           <div className="font-black text-lg flex items-center gap-2"><ShoppingBag size={20} className="text-[#bfe1f8]" /> سلة المقتنيات ({cartCount})</div>
           <button onClick={() => setCartOpen(false)} className="w-9 h-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="إغلاق"><X size={20} /></button>

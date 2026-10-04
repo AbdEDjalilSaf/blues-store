@@ -12,35 +12,32 @@ interface Props {
   id?: string;
 }
 
-const BASE: CSSProperties = {
-  opacity: 0,
-  transform: 'translateY(28px)',
+const TRANSITION: CSSProperties = {
   transitionProperty: 'opacity, transform',
   transitionDuration: '.7s',
   transitionTimingFunction: 'cubic-bezier(.22,.61,.36,1)',
-  willChange: 'opacity, transform',
 };
 
-const VISIBLE: Record<Effect, CSSProperties> = {
-  'fade-up': { opacity: 1, transform: 'translateY(0)' },
-  'zoom-in': { opacity: 1, transform: 'scale(1)' },
-  'fade-in': { opacity: 1, transform: 'none' },
-};
-
-const HIDDEN: Record<Effect, CSSProperties> = {
+const FROM: Record<Effect, CSSProperties> = {
   'fade-up': { opacity: 0, transform: 'translateY(28px)' },
   'zoom-in': { opacity: 0, transform: 'scale(.94)' },
   'fade-in': { opacity: 0, transform: 'none' },
 };
 
+const TO: Record<Effect, CSSProperties> = {
+  'fade-up': { opacity: 1, transform: 'translateY(0)' },
+  'zoom-in': { opacity: 1, transform: 'scale(1)' },
+  'fade-in': { opacity: 1, transform: 'none' },
+};
+
 export default function Reveal({ as: Tag = 'div', effect = 'fade-up', delay = 0, className, style, children, id }: Props) {
   const ref = useRef<HTMLElement | null>(null);
-  const [shown, setShown] = useState(false);
+  // Seeded from the environment so the effect never has to call setState.
+  const [shown, setShown] = useState(() => typeof IntersectionObserver === 'undefined');
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') { setShown(true); return; }
+    if (!el || shown) return;
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -55,12 +52,14 @@ export default function Reveal({ as: Tag = 'div', effect = 'fade-up', delay = 0,
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [shown]);
 
+  // `will-change` is only applied while the element is still animating. Leaving
+  // it on permanently promotes every revealed block to its own compositor
+  // layer for the life of the page, which costs memory and GPU time.
   const merged: CSSProperties = {
-    ...(shown ? VISIBLE[effect] : HIDDEN[effect]),
-    ...BASE,
-    ...(shown ? VISIBLE[effect] : HIDDEN[effect]),
+    ...TRANSITION,
+    ...(shown ? TO[effect] : { ...FROM[effect], willChange: 'opacity, transform' }),
     transitionDelay: delay ? `${delay}ms` : undefined,
     ...style,
   };
