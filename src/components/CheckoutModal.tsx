@@ -4,12 +4,12 @@ import { formatPrice } from '../lib/api';
 import { saveOrder } from '../lib/catalog';
 import { useCart, useShopActions } from '../store/shop';
 
-const CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'أبها', 'تبوك', 'بريدة', 'خميس مشيط', 'حائل', 'جازان', 'نجران', 'ينبع', 'الطائف', 'أخرى'];
+const CITIES = ['أدرار', 'الشلف', 'الأغواط', 'أم البواقي', 'باتنة', 'بجاية', 'بسكرة', 'بشار', 'البليدة', 'البويرة', 'تمنراست', 'تبسة', 'تلمسان', 'تيارت', 'تيزي وزو', 'الجزائر', 'الجلفة', 'جيجل', 'سطيف', 'سعيدة', 'سكيكدة', 'سيدي بلعباس', 'عنابة', 'قالمة', 'قسنطينة', 'المدية', 'مستغانم', 'المسيلة', 'معسكر', 'ورقلة', 'وهران', 'البيض', 'إليزي', 'برج بوعريريج', 'بومرداس', 'الطارف', 'تندوف', 'تيسمسيلت', 'الوادي', 'خنشلة', 'سوق أهراس', 'تيبازة', 'ميلة', 'عين الدفلى', 'النعامة', 'عين تموشنت', 'غرداية', 'غليزان', 'تيميمون', 'برج باجي مختار', 'أولاد جلال', 'بني عباس', 'عين صالح', 'عين قزام', 'تقرت', 'جانت', 'المغير', 'المنيعة', 'آفلو', 'بريكة', 'القنطرة', 'بئر العاتر', 'العريشة', 'الأبيض سيدي الشيخ', 'المغير', 'الحجيرة', 'عين وسارة', 'مسعد', 'قصر الشلالة'];
 
 export default function CheckoutModal({ open, onClose }: { open: boolean; onClose: (orderId?: number) => void }) {
   const { cart, subtotal } = useCart();
   const { clearCart, showToast } = useShopActions();
-  const [form, setForm] = useState({ name: '', phone: '', city: 'الرياض', address: '', notes: '', pay: 'عند الاستلام' });
+  const [form, setForm] = useState({ name: '', phone: '', city: 'الجزائر', address: '', notes: '', pay: 'عند الاستلام' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [doneId, setDoneId] = useState<number | null>(null);
@@ -124,8 +124,7 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
                   ))}
                 </div>
                 <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/60"><span>الشحن</span><span>{shipping === 0 ? 'مجاني' : formatPrice(shipping)}</span></div>
-                {discount > 0 && <div className="flex justify-between text-[13px] font-black text-[#1d6fd1]"><span>خصم ZAMAN10</span><span>- {formatPrice(discount)}</span></div>}
-                <div className="flex justify-between font-black text-lg text-[#0f2f52] border-t border-dashed border-[#0f2f52]/15 pt-2"><span>الإجمالي</span><span>{formatPrice(grand)}</span></div>
+                <div className="flex justify-between font-black text-lg text-[#0f2f52] border-t border-dashed border-[#0f2f52]/15 pt-2"><span>الإجمالي</span><span>{formatPrice(Number(cart.reduce((sum, c) => sum + Number(c.product.price) * c.qty, 0)) + shipping)}</span></div>
               </div>
               <button disabled={sending} className="bg-[#1565c0] hover:bg-[#0d47a1] disabled:opacity-60 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 text-[15px]">
                 {sending ? <><Loader2 size={19} className="animate-spin" /> جارٍ تأكيد طلبك…</> : <><BadgeCheck size={19} /> تأكيد الطلب — {formatPrice(grand)}</>}

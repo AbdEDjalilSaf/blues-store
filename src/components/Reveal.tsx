@@ -48,7 +48,7 @@ export default function Reveal({ as: Tag = 'div', effect = 'fade-up', delay = 0,
           }
         }
       },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+      { threshold: 0.01, rootMargin: '0px 0px -50px 0px' }
     );
     io.observe(el);
     return () => io.disconnect();

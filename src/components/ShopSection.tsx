@@ -141,9 +141,7 @@ export default function ShopSection({ products, search, onView }: Props) {
             </>
           )}
         </div>
-        <div className="mt-8 text-center text-[13px] font-bold text-[#0f2f52]/50">
-          جميع القطع أصلية ومرفقة بشهادة فحص • الكميات محدودة بحكم الندرة
-        </div>
+       
       </div>
     </Reveal>
   );

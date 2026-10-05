@@ -21,8 +21,6 @@ const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
 const Story = lazy(() => import('./components/Story'));
 const Auth = lazy(() => import('./components/Auth'));
 const ReviewsSection = lazy(() => import('./components/ReviewsSection'));
-const OrderTracker = lazy(() => import('./components/OrderTracker'));
-const Newsletter = lazy(() => import('./components/Newsletter'));
 
 /* Derived from static data once, at module scope, so the array identity is
    stable and the memoised product grid never re-renders because of App state. */
@@ -111,17 +109,6 @@ function Site() {
           </Suspense>
         </LazySection>
 
-        <LazySection minHeight={380}>
-          <Suspense fallback={<div style={{ minHeight: 380 }} />}>
-            <OrderTracker />
-          </Suspense>
-        </LazySection>
-
-        <LazySection minHeight={340}>
-          <Suspense fallback={<div style={{ minHeight: 340 }} />}>
-            <Newsletter />
-          </Suspense>
-        </LazySection>
       </main>
 
       <Footer />

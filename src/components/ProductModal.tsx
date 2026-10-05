@@ -112,11 +112,7 @@ export default function ProductModal({ p, onClose }: Props) {
             </div>
             {sizeErr && <div className="text-[13px] font-black text-[#1565c0] mb-2">فضلاً اختر المقاس أولاً</div>}
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-1 bg-white border-2 border-[#0f2f52]/15 rounded-full p-1">
-                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 grid place-items-center rounded-full hover:bg-[#0f2f52]/10" aria-label="إنقاص"><Minus size={16} /></button>
-                <span className="w-8 text-center font-black">{qty}</span>
-                <button onClick={() => setQty((q) => Math.min(9, q + 1))} className="w-9 h-9 grid place-items-center rounded-full hover:bg-[#0f2f52]/10" aria-label="زيادة"><Plus size={16} /></button>
-              </div>
+    
               <div className="ms-auto text-left">
                 <div className="font-black text-2xl text-[#0f2f52]">{formatPrice(Number(p.price) * qty)}</div>
                 {p.old_price && <div className="text-[13px] font-bold text-[#0f2f52]/40 line-through">{formatPrice(Number(p.old_price) * qty)}</div>}

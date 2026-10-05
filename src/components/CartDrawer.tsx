@@ -49,7 +49,6 @@ export default function CartDrawer({ onCheckout }: { onCheckout: () => void }) {
               ))}
               <div className="grid grid-cols-2 gap-2 text-[12px] font-black">
                 <div className="bg-[#1d6fd1]/10 border border-[#1d6fd1]/20 text-[#0f4c9c] rounded-xl p-2.5 flex items-center gap-1.5"><ShieldCheck size={16} /> فحص + شهادة أصالة</div>
-                <div className="bg-[#2f9de4]/10 border border-[#2f9de4]/30 text-[#0f4c9c] rounded-xl p-2.5 flex items-center gap-1.5"><Truck size={16} /> تغليف هدايا مجاني</div>
               </div>
             </div>
             <div className="border-t-2 border-dashed border-[#0f2f52]/15 bg-white p-5 space-y-2">

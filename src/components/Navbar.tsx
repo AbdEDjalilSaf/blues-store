@@ -115,6 +115,9 @@ export default function Navbar({ onSearch }: Props) {
                 aria-label="ابحث عن قميص"
                 className="flex-1 bg-transparent outline-none text-sm font-bold text-[#0f2f52] placeholder:text-[#0f2f52]/40"
               />
+              <button type="button" onClick={() => setShowSearch(false)} className="text-[#0f2f52]/50 hover:text-[#0f2f52] shrink-0" aria-label="إغلاق البحث">
+                <X size={18} />
+              </button>
               {q && (
                 <button type="button" onClick={clear} className="text-xs font-black text-[#1565c0]">
                   مسح
