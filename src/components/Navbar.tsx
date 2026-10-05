@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { Menu, Search, ShoppingBag, X } from 'lucide-react';
-import { useCart, useShopActions, useWishlist } from '../store/shop';
+import { useCart, useShopActions } from '../store/shop';
 import Logo from './Logo';
 
 const LINKS = [
@@ -17,7 +17,6 @@ interface Props {
 export default function Navbar({ onSearch }: Props) {
   const { cartCount } = useCart();
   const { setCartOpen } = useShopActions();
-  const wishlist = useWishlist();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -70,19 +69,6 @@ export default function Navbar({ onSearch }: Props) {
             >
               <Search size={20} />
             </button>
-
-            {wishlist.length > 0 && (
-              <a
-                href="#shop"
-                className="relative hidden sm:grid w-10 h-10 place-items-center rounded-full hover:bg-[#0f2f52]/20 text-[#f5f9fe]/95"
-                aria-label={`المفضلة (${wishlist.length})`}
-              >
-                <ShoppingBag size={20} />
-                <span className="absolute -top-0.5 -left-0.5 min-w-5 h-5 px-1 rounded-full bg-[#1565c0] text-white text-[11px] font-black grid place-items-center">
-                  {wishlist.length}
-                </span>
-              </a>
-            )}
 
             <button
               onClick={() => setCartOpen(true)}

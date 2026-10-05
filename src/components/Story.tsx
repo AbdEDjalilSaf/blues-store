@@ -25,11 +25,7 @@ export default function Story() {
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {['1962', '1970', '1982', '1986', '1990', '1998'].map((y, i) => (
-              <span key={y} className={`px-4 py-2 rounded-full text-[13px] font-black border ${i === 1 ? 'bg-[#2f9de4] text-[#0f2f52] border-[#2f9de4]' : 'border-[#f5f9fe]/20 text-[#f5f9fe]/70'}`}>{y}</span>
-            ))}
-          </div>
+          
         </Reveal>
         <Reveal effect="zoom-in" delay={100}>
         <div className="grid grid-cols-2 gap-3 md:gap-4">

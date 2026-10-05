@@ -20,7 +20,7 @@ export default function Logo({ className = '' }: Props) {
       decoding="async"
       loading="eager"
       fetchPriority="high"
-      className={`${className} w-10 h-10 shrink-0 object-cover rounded-lg`}
+      className={`${className} w-18 h-18 shrink-0 object-cover rounded-lg`}
     />
   );
 }

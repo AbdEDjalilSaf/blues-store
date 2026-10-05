@@ -233,7 +233,7 @@ export const products: Product[] = [
     category: 'منتخبات',
     featured: false,
   },
-];
+]; 
 
 const baseReviews: Review[] = [
   { id: 9001, product_id: 1, author: 'سمير بوزيد', rating: 5, text: 'وصل القميص والتغليف فخم جداً، والفحص مع الشهادة عطاني ثقة كاملة بالأصالة. القطعة أجمل من الصور.', created_at: '2026-08-12T10:00:00.000Z' },

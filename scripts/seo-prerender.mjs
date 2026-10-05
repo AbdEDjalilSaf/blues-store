@@ -187,8 +187,8 @@ const rows = products
     (p) => `      <li>
         <h3><a href="${esc(ALLOC)}">${esc(p.name_ar)}</a></h3>
         <p>${esc(p.team)} • ${p.year} • ${esc(p.era)} • ${esc(p.condition)} • ${esc(p.rarity)}</p>
-        <p>${Number(p.price).toLocaleString('en-US')} ر.س${
-      p.old_price ? ` (بدلاً من ${Number(p.old_price).toLocaleString('en-US')} ر.س)` : ''
+        <p>${Number(p.price).toLocaleString('en-US')} دج${
+      p.old_price ? ` (بدلاً من ${Number(p.old_price).toLocaleString('en-US')} دج)` : ''
     } — ${Number(p.stock) <= 0 ? 'نفدت الكمية' : `متوفر (${p.stock} قطع)`}</p>
         <p>${esc(p.description_ar)}</p>
       </li>`

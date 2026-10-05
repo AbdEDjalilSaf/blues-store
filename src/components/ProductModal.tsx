@@ -94,7 +94,6 @@ export default function ProductModal({ p, onClose }: Props) {
               <span className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} className={i < Math.round(Number(p.rating)) ? 'fill-[#2f9de4] text-[#2f9de4]' : 'text-[#0f2f52]/20'} />)}</span>
               <span className="text-[13px] font-black text-[#0f2f52]">{Number(p.rating).toFixed(1)}</span>
               <span className="text-[12px] font-bold text-[#0f2f52]/50">({reviews.length || p.reviews_count} تقييم)</span>
-              <button onClick={() => toggleWish(p.id)} className={`ms-auto flex items-center gap-1 text-[12px] font-black px-3 py-1.5 rounded-full border-2 ${wished ? 'bg-[#1565c0] text-white border-[#1565c0]' : 'border-[#0f2f52]/15 text-[#0f2f52]'}`}><Heart size={14} className={wished ? 'fill-current' : ''} />{wished ? 'في المفضلة' : 'مفضلة'}</button>
             </div>
             <p className="text-[14px] leading-7 font-medium text-[#0f2f52]/75 mb-4">{p.description_ar}</p>
             <div className="flex flex-wrap gap-2 mb-4 text-[12px] font-black">

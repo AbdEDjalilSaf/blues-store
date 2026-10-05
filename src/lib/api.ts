@@ -62,5 +62,5 @@ export function parseSizes(s: string): string[] {
 }
 
 export function formatPrice(n: number): string {
-  return `${Number(n).toLocaleString('ar-SA')} ر.س`;
+  return `${Number(n).toLocaleString('en-US')} دج`;
 }

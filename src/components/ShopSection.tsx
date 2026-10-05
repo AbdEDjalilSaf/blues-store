@@ -82,19 +82,7 @@ export default function ShopSection({ products, search, onView }: Props) {
           <div className="flex items-center gap-2 mb-3 text-[#0f2f52] font-black text-sm">
             <SlidersHorizontal size={17} /> فلترة وترتيب
           </div>
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="text-[12px] font-black text-[#0f2f52]/50 w-full sm:w-auto">الحقبة:</span>
-            {ERAS.map((e) => (
-              <button
-                key={e}
-                onClick={() => setEra(e)}
-                aria-pressed={era === e}
-                className={`px-4 py-2 rounded-full text-[13px] font-black transition-all border-2 ${era === e ? 'bg-[#0f2f52] text-[#f5f9fe] border-[#0f2f52]' : 'bg-[#f5f9fe] text-[#0f2f52] border-transparent hover:border-[#0f2f52]/20'}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
+          
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-black text-[#0f2f52]/50">التصنيف:</span>
             {CATS.map((c) => (
@@ -117,15 +105,7 @@ export default function ShopSection({ products, search, onView }: Props) {
                 />
                 المتوفر فقط
               </label>
-              <label className="flex items-center gap-2 text-[13px] font-black text-[#0f2f52] bg-[#f5f9fe] rounded-full px-4 py-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showWish}
-                  onChange={(e) => setShowWish(e.target.checked)}
-                  className="accent-[#1565c0] w-4 h-4"
-                />
-                المفضلة ♥
-              </label>
+              
               <label className="sr-only-focusable" htmlFor="sort">
                 ترتيب المنتجات
               </label>

@@ -1,7 +1,7 @@
 ﻿import { memo } from 'react';
-import { Eye, Heart, Star } from 'lucide-react';
+import { Eye, Star } from 'lucide-react';
 import { formatPrice, parseSizes, type Product } from '../lib/api';
-import { useShopActions, useWishlist } from '../store/shop';
+import { useShopActions } from '../store/shop';
 
 interface Props {
   p: Product;
@@ -9,11 +9,7 @@ interface Props {
 }
 
 function ProductCard({ p, onView }: Props) {
-  // Stable actions + a single shared wishlist array: this component only
-  // re-renders when the wishlist changes, never when the cart or the toast do.
-  const { addToCart, toggleWish } = useShopActions();
-  const wishlist = useWishlist();
-  const wished = wishlist.includes(p.id);
+  const { addToCart } = useShopActions();
 
   const sizes = parseSizes(p.sizes);
   const discount = p.old_price ? Math.round((1 - Number(p.price) / Number(p.old_price)) * 100) : 0;
@@ -37,14 +33,7 @@ function ProductCard({ p, onView }: Props) {
           {p.badge && <span className="bg-[#1565c0] text-white text-[11px] font-black px-3 py-1 rounded-full shadow">{p.badge}</span>}
           {discount > 0 && <span className="bg-[#2f9de4] text-[#0f2f52] text-[11px] font-black px-3 py-1 rounded-full shadow">خصم {discount}%</span>}
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleWish(p.id); }}
-          aria-label={wished ? `إزالة ${p.name_ar} من المفضلة` : `إضافة ${p.name_ar} إلى المفضلة`}
-          aria-pressed={wished}
-          className={`absolute top-3 left-3 w-9 h-9 grid place-items-center rounded-full shadow transition-all ${wished ? 'bg-[#1565c0] text-white' : 'bg-white/90 text-[#0f2f52] hover:bg-[#1565c0] hover:text-white'}`}
-        >
-          <Heart size={17} className={wished ? 'fill-current' : ''} />
-        </button>
+       
         {soldOut && (
           <div className="absolute inset-0 bg-[#0f2f52]/60 grid place-items-center">
             <span className="bg-[#f5f9fe] text-[#1565c0] font-black px-5 py-2 rounded-full text-sm rotate-[-6deg] border-2 border-[#1565c0]">نفدت الكمية</span>
