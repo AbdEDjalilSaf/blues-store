@@ -14,7 +14,7 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
   const [sending, setSending] = useState(false);
   const [doneId, setDoneId] = useState<number | null>(null);
 
-  if (!open) return null;
+  if (!open) return null;  
   const shipping = subtotal >= 300 || subtotal === 0 ? 0 : 25;
   const total = subtotal + shipping;
   let discount = 0;
@@ -27,7 +27,7 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
   const validate = () => {
     const e: Record<string, string> = {};
     if (form.name.trim().length < 3) e.name = 'فضلاً أدخل الاسم الكامل';
-    if (!/^(05\d{8}|\+9665\d{8})$/.test(form.phone.replace(/[\s-]/g, ''))) e.phone = 'رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام';
+    if (!/^(0[5-7]\d{8})$/.test(form.phone.replace(/[\s-]/g, ''))) e.phone = 'رقم الجوال يجب أن يبدأ بـ 05 أو 06 أو 07 ويتكون من 10 أرقام';
     if (!form.city) e.city = 'اختر المدينة';
     if (form.address.trim().length < 8) e.address = 'فضلاً أدخل العنوان بالتفصيل (الحي + الشارع)';
     setErrors(e);
@@ -98,20 +98,13 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
                     {CITIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="font-black text-[13px] text-[#0f2f52] mb-1.5 block">ملاحظات (اختياري)</label>
-                  <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="تغليف هدية؟ مقاس بديل؟" className="w-full bg-white border-2 border-[#0f2f52]/12 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-[#2f9de4]" />
-                </div>
+                
               </div>
-              <div>
-                <label className="font-black text-[13px] text-[#0f2f52] mb-1.5 block">العنوان التفصيلي *</label>
-                <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="الحي، الشارع، رقم المبنى، أقرب معلم…" rows={2} className={`w-full bg-white border-2 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-[#2f9de4] resize-none ${errors.address ? 'border-[#1565c0]' : 'border-[#0f2f52]/12'}`} />
-                {errors.address && <div className="text-[12px] font-black text-[#1565c0] mt-1">{errors.address}</div>}
-              </div>
+              
               <div>
                 <div className="font-black text-[13px] text-[#0f2f52] mb-2">طريقة الدفع</div>
                 <div className="grid grid-cols-3 gap-2">
-                  {[{ v: 'عند الاستلام', i: Banknote }, { v: 'بطاقة مدى', i: CreditCard }, { v: 'Apple Pay', i: Wallet }].map((m) => (
+                  {[{ v: 'عند الاستلام', i: Banknote }].map((m) => (
                     <button type="button" key={m.v} onClick={() => setForm({ ...form, pay: m.v })} className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 font-black text-[12px] transition-all ${form.pay === m.v ? 'border-[#0f2f52] bg-[#0f2f52] text-white' : 'border-[#0f2f52]/12 bg-white text-[#0f2f52]'}`}><m.i size={20} />{m.v}</button>
                   ))}
                 </div>
@@ -129,7 +122,6 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
               <button disabled={sending} className="bg-[#1565c0] hover:bg-[#0d47a1] disabled:opacity-60 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 text-[15px]">
                 {sending ? <><Loader2 size={19} className="animate-spin" /> جارٍ تأكيد طلبك…</> : <><BadgeCheck size={19} /> تأكيد الطلب — {formatPrice(grand)}</>}
               </button>
-              <div className="text-center text-[12px] font-bold text-[#0f2f52]/50">بالضغط على تأكيد أنت توافق على سياسة الاستبدال خلال 14 يوم</div>
             </form>
           </>
         )}

@@ -35,13 +35,9 @@ export default function CartDrawer({ onCheckout }: { onCheckout: () => void }) {
                   <div className="flex-1 min-w-0">
                     <div className="font-black text-[13px] text-[#0f2f52] truncate">{c.product.name_ar}</div>
                     <div className="text-[12px] font-bold text-[#0f2f52]/50">مقاس {c.size} • {c.product.year}</div>
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-1 bg-[#f5f9fe] border border-[#0f2f52]/15 rounded-full p-0.5">
-                        <button onClick={() => updateQty(c.product.id, c.size, c.qty - 1)} className="w-7 h-7 grid place-items-center rounded-full hover:bg-[#0f2f52]/10" aria-label="إنقاص"><Minus size={13} /></button>
-                        <span className="w-6 text-center font-black text-[13px]">{c.qty}</span>
-                        <button onClick={() => updateQty(c.product.id, c.size, c.qty + 1)} className="w-7 h-7 grid place-items-center rounded-full hover:bg-[#0f2f52]/10" aria-label="زيادة"><Plus size={13} /></button>
-                      </div>
-                      <div className="font-black text-[14px] text-[#0f2f52]">{formatPrice(Number(c.product.price) * c.qty)}</div>
+                    <div className="flex justify-end mt-2">
+                      
+                      <div className="font-black flex justify-end text-[14px] text-[#0f2f52]">{formatPrice(Number(c.product.price) * c.qty)}</div>
                     </div>
                   </div>
                   <button onClick={() => removeFromCart(c.product.id, c.size)} className="self-start text-[#1565c0]/60 hover:text-[#1565c0] p-1" aria-label="حذف"><Trash2 size={17} /></button>

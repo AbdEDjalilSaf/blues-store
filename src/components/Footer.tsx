@@ -89,7 +89,7 @@ export default function Footer() {
           <ul className="space-y-3 text-[14px] font-bold text-[#f5f9fe]/70">
             <li className="flex items-center gap-2">
               <Phone size={16} className="text-[#bfe1f8] shrink-0" />
-              <a href="tel:+966551234567" dir="ltr">+966 55 123 4567</a>
+              <a href="tel:+966551234567" dir="ltr">+213 540954587 </a>
             </li>
             <li className="flex items-center gap-2">
               <MapPin size={16} className="text-[#bfe1f8] shrink-0" /> الجزائر • نشحن لكل الولايات
