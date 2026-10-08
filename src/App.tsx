@@ -1,4 +1,4 @@
-﻿import { Suspense, lazy, memo, useCallback, useState } from 'react';
+﻿import { Suspense, lazy, memo, useCallback, useEffect, useState } from 'react';
 import { ShopProvider } from './store/ShopContext';
 import { useCart } from './store/shop';
 import Navbar from './components/Navbar';
@@ -10,6 +10,7 @@ import Footer from './components/Footer';
 import LazySection from './components/LazySection';
 import ProductCard from './components/ProductCard';
 import Reveal from './components/Reveal';
+import AdminLogin from './components/AdminLogin';
 import { Flame, Sparkles } from 'lucide-react';
 
 import type { Product } from './lib/api';
@@ -135,6 +136,16 @@ function Site() {
 }
 
 export default function App() {
+  const [hash, setHash] = useState(() => window.location.hash);
+
+  useEffect(() => {
+    const onHashChange = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  if (hash === '#admin') return <AdminLogin />;
+
   return (
     <ShopProvider>
       <Site />
