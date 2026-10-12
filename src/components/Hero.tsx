@@ -170,7 +170,7 @@ export default function Hero({ count }: { count: number }) {
             </p>
             <div className="flex flex-wrap gap-3 mb-8">
               <a href="#shop" className="bg-[#2f9de4] hover:bg-[#bfe1f8] text-[#0f2f52] font-black px-7 py-3.5 rounded-full text-[15px] shadow-[0_10px_30px_rgba(47,157,228,.35)] transition-all hover:-translate-y-0.5">
-                {s.useCount ? `${s.cta} (${count})` : s.cta}
+                {s.useCount && count > 0 ? `${s.cta} (${count})` : s.cta}
               </a>
               <a href="#story" className="border-2 border-[#f5f9fe]/30 hover:border-[#bfe1f8] hover:text-[#bfe1f8] font-black px-7 py-3.5 rounded-full text-[15px] transition-all">
                 قصتنا

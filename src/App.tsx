@@ -5,17 +5,24 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import CategoryCarousel from './components/CategoryCarousel';
 import Ticker from './components/Ticker';
-import ShopSection from './components/ShopSection';
 import Footer from './components/Footer';
 import LazySection from './components/LazySection';
-import ProductCard from './components/ProductCard';
-import Reveal from './components/Reveal';
+import ErrorBoundary from './components/ErrorBoundary';
+import CatalogError from './components/CatalogError';
+import { CatalogSkeleton } from './components/ProductSkeleton';
 import AdminLogin from './components/AdminLogin';
-import { Flame, Sparkles } from 'lucide-react';
+import { prefetchProducts, resetProducts, useProductsSnapshot } from './lib/products';
 
 import type { Product } from './lib/api';
-import { products } from './lib/catalog';
 
+/* Start the catalog request during script evaluation, in parallel with the
+   entry bundle + fonts, so the data is usually already in flight by the time
+   the lazy `Catalog` chunk mounts. Skipped on the admin route. */
+if (typeof window !== 'undefined' && window.location.hash !== '#admin') {
+  prefetchProducts();
+}
+
+const Catalog = lazy(() => import('./components/Catalog'));
 const ProductModal = lazy(() => import('./components/ProductModal'));
 const CartDrawer = lazy(() => import('./components/CartDrawer'));
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
@@ -23,49 +30,18 @@ const Story = lazy(() => import('./components/Story'));
 const Auth = lazy(() => import('./components/Auth'));
 const ReviewsSection = lazy(() => import('./components/ReviewsSection'));
 
-/* Derived from static data once, at module scope, so the array identity is
-   stable and the memoised product grid never re-renders because of App state. */
-const FEATURED = products.filter((p) => p.featured).slice(0, 4);
-
 const TickerMemo = memo(Ticker);
 const HeroMemo = memo(Hero);
 const CategoryMemo = memo(CategoryCarousel);
-const ShopMemo = memo(ShopSection);
-
-function FeaturedRow({ onView }: { onView: (p: Product) => void }) {
-  return (
-    <Reveal as="section" effect="fade-up" className="bg-[#f5f9fe] pt-10 md:pt-14" aria-labelledby="featured-heading">
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex items-end justify-between mb-5">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-[#1565c0] text-white font-black text-[12px] px-4 py-1.5 rounded-full mb-2">
-              <Flame size={14} /> الأكثر طلباً
-            </div>
-            <h2 id="featured-heading" className="font-black text-2xl md:text-4xl text-[#0f2f52]">
-              قطع يتنافس عليها الجامعون
-            </h2>
-          </div>
-          <a href="#shop" className="hidden sm:inline-flex items-center gap-1.5 font-black text-sm text-[#1565c0] hover:gap-3 transition-all">
-            عرض الكل <Sparkles size={16} />
-          </a>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-          {FEATURED.map((p) => (
-            <ProductCard key={p.id} p={p} onView={onView} />
-          ))}
-        </div>
-      </div>
-    </Reveal>
-  );
-}
-
-const FeaturedMemo = memo(FeaturedRow);
 
 function Site() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Product | null>(null);
   const [checkout, setCheckout] = useState(false);
   const { cartOpen } = useCart();
+  // Non-suspending view of the catalog: lets the hero paint immediately and
+  // pick up the real count once the request resolves.
+  const products = useProductsSnapshot();
 
   // `setSelected` is already stable; these wrappers keep every prop identity
   // stable so the memoised children below never re-render on App state change.
@@ -89,8 +65,15 @@ function Site() {
         <HeroMemo count={products.length} />
         <TickerMemo />
         <CategoryMemo />
-        <FeaturedMemo onView={openProduct} />
-        <ShopMemo products={products} search={search} onView={openProduct} />
+
+        <ErrorBoundary
+          onReset={resetProducts}
+          fallback={(error, reset) => <CatalogError error={error} onRetry={reset} />}
+        >
+          <Suspense fallback={<CatalogSkeleton />}>
+            <Catalog search={search} onView={openProduct} />
+          </Suspense>
+        </ErrorBoundary>
 
         <LazySection minHeight={900}>
           <Suspense fallback={<div style={{ minHeight: 900 }} />}>

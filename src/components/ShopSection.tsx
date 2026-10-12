@@ -1,12 +1,11 @@
 ﻿import { useDeferredValue, useMemo, useState } from 'react';
-import { PackageSearch, SlidersHorizontal } from 'lucide-react';
+import { PackageOpen, PackageSearch, SlidersHorizontal } from 'lucide-react';
 import type { Product } from '../lib/api';
 import { useWishlist } from '../store/shop';
 import ProductCard from './ProductCard';
 import Reveal from './Reveal';
 
-const ERAS = ['الكل', 'الستينات', 'السبعينات', 'الثمانينات', 'التسعينات'];
-const CATS = ['الكل', 'منتخبات', 'أندية'];
+const ALL = 'الكل';
 const SORTS = [
   { v: 'feat', t: 'المميز أولاً' },
   { v: 'cheap', t: 'السعر: من الأقل' },
@@ -15,6 +14,20 @@ const SORTS = [
   { v: 'new', t: 'الأحدث سنة' },
 ];
 
+/** Era / category options follow whatever the API actually returned. */
+function useFilterOptions(products: Product[]) {
+  return useMemo(() => {
+    const eras = new Set<string>();
+    const cats = new Set<string>();
+    for (const p of products) {
+      if (p.era) eras.add(p.era);
+      if (p.category) cats.add(p.category);
+    }
+    const sorted = (set: Set<string>) => [ALL, ...[...set].sort((a, b) => a.localeCompare(b, 'ar'))];
+    return { eras: sorted(eras), cats: sorted(cats) };
+  }, [products]);
+}
+
 interface Props {
   products: Product[];
   search: string;
@@ -22,8 +35,8 @@ interface Props {
 }
 
 export default function ShopSection({ products, search, onView }: Props) {
-  const [era, setEra] = useState('الكل');
-  const [cat, setCat] = useState('الكل');
+  const [era, setEra] = useState(ALL);
+  const [cat, setCat] = useState(ALL);
   const [sort, setSort] = useState('feat');
   const [onlyAvail, setOnlyAvail] = useState(false);
   const [showWish, setShowWish] = useState(false);
@@ -31,6 +44,7 @@ export default function ShopSection({ products, search, onView }: Props) {
   // Reactive subscription instead of a localStorage read inside useMemo, which
   // was un-trackable and could show a stale wishlist filter.
   const wishlist = useWishlist();
+  const { eras, cats } = useFilterOptions(products);
 
   const list = useMemo(() => {
     let l = [...products];
@@ -39,15 +53,15 @@ export default function ShopSection({ products, search, onView }: Props) {
       const needle = q.toLowerCase();
       l = l.filter(
         (p) =>
-          p.name_ar.includes(needle) ||
-          p.team.includes(needle) ||
-          p.description_ar.includes(needle) ||
+          (p.name_ar ?? '').toLowerCase().includes(needle) ||
+          (p.team ?? '').toLowerCase().includes(needle) ||
+          (p.description_ar ?? '').toLowerCase().includes(needle) ||
           String(p.year).includes(needle) ||
-          p.era.includes(needle)
+          (p.era ?? '').includes(needle)
       );
     }
-    if (era !== 'الكل') l = l.filter((p) => p.era === era);
-    if (cat !== 'الكل') l = l.filter((p) => p.category === cat);
+    if (era !== ALL) l = l.filter((p) => p.era === era);
+    if (cat !== ALL) l = l.filter((p) => p.category === cat);
     if (onlyAvail) l = l.filter((p) => (p.stock || 0) > 0);
     if (showWish) {
       const w = new Set(wishlist);
@@ -78,70 +92,93 @@ export default function ShopSection({ products, search, onView }: Props) {
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl border-2 border-[#0f2f52]/10 p-4 md:p-5 mb-8 shadow-[0_10px_30px_rgba(18,41,28,.06)]">
-          <div className="flex items-center gap-2 mb-3 text-[#0f2f52] font-black text-sm">
-            <SlidersHorizontal size={17} /> فلترة وترتيب
+        {products.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-[#0f2f52]/20">
+            <PackageOpen size={52} className="mx-auto text-[#0f2f52]/30 mb-3" />
+            <div className="font-black text-xl text-[#0f2f52] mb-1">لا توجد منتجات متاحة حالياً</div>
+            <p className="text-sm font-bold text-[#0f2f52]/50">عاد إلينا قريباً بتشكيلة جديدة من الأقمصة الأصلية.</p>
           </div>
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[12px] font-black text-[#0f2f52]/50">التصنيف:</span>
-            {CATS.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                aria-pressed={cat === c}
-                className={`px-4 py-2 rounded-full text-[13px] font-black transition-all border-2 ${cat === c ? 'bg-[#1565c0] text-white border-[#1565c0]' : 'bg-[#f5f9fe] text-[#0f2f52] border-transparent hover:border-[#0f2f52]/20'}`}
-              > 
-                {c}
-              </button>
-            ))}
-            <span className="w-full sm:w-auto sm:ms-auto flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
-              <label className="flex items-center gap-2 text-[13px] font-black text-[#0f2f52] bg-[#f5f9fe] rounded-full px-4 py-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={onlyAvail}
-                  onChange={(e) => setOnlyAvail(e.target.checked)}
-                  className="accent-[#1d6fd1] w-4 h-4"
-                />
-                المتوفر فقط
-              </label>
-              
-              <label className="sr-only-focusable" htmlFor="sort">
-                ترتيب المنتجات
-              </label>
-              <select
-                id="sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="text-[13px] font-black bg-[#0f2f52] text-[#f5f9fe] rounded-full px-4 py-2.5 outline-none cursor-pointer"
-              >
-                {SORTS.map((s) => (
-                  <option key={s.v} value={s.v}>{s.t}</option>
-                ))}
-              </select>
-            </span>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="bg-white rounded-3xl border-2 border-[#0f2f52]/10 p-4 md:p-5 mb-8 shadow-[0_10px_30px_rgba(18,41,28,.06)]">
+              <div className="flex items-center gap-2 mb-3 text-[#0f2f52] font-black text-sm">
+                <SlidersHorizontal size={17} /> فلترة وترتيب
+              </div>
 
-        <div aria-live="polite">
-          {list.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-[#0f2f52]/20">
-              <PackageSearch size={48} className="mx-auto text-[#0f2f52]/30 mb-3" />
-              <div className="font-black text-xl text-[#0f2f52] mb-1">لا توجد نتائج مطابقة</div>
-              <p className="text-sm font-bold text-[#0f2f52]/50">جرّب حقبة أو كلمة بحث مختلفة</p>
-            </div>
-          ) : (
-            <>
-              <div className="text-[13px] font-black text-[#0f2f52]/50 mb-4">عرض {list.length} قميص</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
-                {list.map((p) => (
-                  <ProductCard key={p.id} p={p} onView={onView} />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] font-black text-[#0f2f52]/50">التصنيف:</span>
+                {cats.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCat(c)}
+                    aria-pressed={cat === c}
+                    className={`px-4 py-2 rounded-full text-[13px] font-black transition-all border-2 ${cat === c ? 'bg-[#1565c0] text-white border-[#1565c0]' : 'bg-[#f5f9fe] text-[#0f2f52] border-transparent hover:border-[#0f2f52]/20'}`}
+                  >
+                    {c}
+                  </button>
+                ))}
+                <span className="w-full sm:w-auto sm:ms-auto flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                  <label className="flex items-center gap-2 text-[13px] font-black text-[#0f2f52] bg-[#f5f9fe] rounded-full px-4 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onlyAvail}
+                      onChange={(e) => setOnlyAvail(e.target.checked)}
+                      className="accent-[#1d6fd1] w-4 h-4"
+                    />
+                    المتوفر فقط
+                  </label>
+
+                  <label className="sr-only-focusable" htmlFor="sort">
+                    ترتيب المنتجات
+                  </label>
+                  <select
+                    id="sort"
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="text-[13px] font-black bg-[#0f2f52] text-[#f5f9fe] rounded-full px-4 py-2.5 outline-none cursor-pointer"
+                  >
+                    {SORTS.map((s) => (
+                      <option key={s.v} value={s.v}>{s.t}</option>
+                    ))}
+                  </select>
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-dashed border-[#0f2f52]/15">
+                <span className="text-[12px] font-black text-[#0f2f52]/50">الحقبة:</span>
+                {eras.map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => setEra(e)}
+                    aria-pressed={era === e}
+                    className={`px-4 py-2 rounded-full text-[13px] font-black transition-all border-2 ${era === e ? 'bg-[#0f2f52] text-white border-[#0f2f52]' : 'bg-[#f5f9fe] text-[#0f2f52] border-transparent hover:border-[#0f2f52]/20'}`}
+                  >
+                    {e}
+                  </button>
                 ))}
               </div>
-            </>
-          )}
-        </div>
-       
+            </div>
+
+            <div aria-live="polite">
+              {list.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-[#0f2f52]/20">
+                  <PackageSearch size={48} className="mx-auto text-[#0f2f52]/30 mb-3" />
+                  <div className="font-black text-xl text-[#0f2f52] mb-1">لا توجد نتائج مطابقة</div>
+                  <p className="text-sm font-bold text-[#0f2f52]/50">جرّب حقبة أو كلمة بحث مختلفة</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-[13px] font-black text-[#0f2f52]/50 mb-4">عرض {list.length} قميص</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+                    {list.map((p) => (
+                      <ProductCard key={p.id} p={p} onView={onView} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </Reveal>
   );

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { products } from '../lib/catalog';
 import type { CartItem, Product } from '../lib/api';
+import { useProductsSnapshot } from '../lib/products';
 import {
   ActionsCtx,
   CART_KEY,
@@ -42,20 +42,6 @@ function readLines(): CartItemLine[] {
   }
 }
 
-function hydrateLines(lines: CartItemLine[]): CartItem[] {
-  const byId = new Map(products.map((p) => [p.id, p]));
-  const merged = new Map<string, CartItem>();
-  for (const l of lines) {
-    const product = byId.get(l.id);
-    if (!product) continue;
-    const key = `${l.id}|${l.size}`;
-    const existing = merged.get(key);
-    if (existing) existing.qty = Math.min(9, existing.qty + l.qty);
-    else merged.set(key, { product, size: l.size, qty: Math.min(9, l.qty) });
-  }
-  return [...merged.values()];
-}
-
 function readWishlist(): number[] {
   try {
     const raw = localStorage.getItem(WISH_KEY);
@@ -69,22 +55,37 @@ function readWishlist(): number[] {
 }
 
 export function ShopProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>(() => hydrateLines(readLines()));
+  // Persisted lines only carry an id. The full product object is resolved from
+  // the catalog once it has loaded, so nothing is fetched twice.
+  const [lines, setLines] = useState<CartItemLine[]>(readLines);
   const [wishlist, setWishlist] = useState<number[]>(readWishlist);
   const [cartOpen, setCartOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
+  const products = useProductsSnapshot();
+  const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
+  const cart = useMemo<CartItem[]>(() => {
+    const merged = new Map<string, CartItem>();
+    for (const line of lines) {
+      const product = productMap.get(line.id);
+      if (!product) continue;
+      const key = `${line.id}|${line.size}`;
+      const existing = merged.get(key);
+      if (existing) existing.qty = Math.min(9, existing.qty + line.qty);
+      else merged.set(key, { product, size: line.size, qty: Math.min(9, line.qty) });
+    }
+    return [...merged.values()];
+  }, [lines, productMap]);
+
   useEffect(() => {
     try {
-      localStorage.setItem(
-        CART_KEY,
-        JSON.stringify(cart.map((c) => ({ id: c.product.id, size: c.size, qty: c.qty })))
-      );
+      localStorage.setItem(CART_KEY, JSON.stringify(lines));
     } catch {
       /* quota / private mode — the cart simply will not persist */
     }
-  }, [cart]);
+  }, [lines]);
 
   useEffect(() => {
     try { localStorage.setItem(WISH_KEY, JSON.stringify(wishlist)); } catch { /* ignore */ }
@@ -100,14 +101,14 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback(
     (p: Product, size: string, qty = 1) => {
-      setCart((prev) => {
-        const i = prev.findIndex((c) => c.product.id === p.id && c.size === size);
+      setLines((prev) => {
+        const i = prev.findIndex((l) => l.id === p.id && l.size === size);
         if (i >= 0) {
           const next = prev.slice();
           next[i] = { ...next[i], qty: Math.min(9, next[i].qty + qty) };
           return next;
         }
-        return [...prev, { product: p, size, qty }];
+        return [...prev, { id: p.id, size, qty: Math.min(9, qty) }];
       });
       showToast(`أُضيف "${p.name_ar}" إلى السلة`);
     },
@@ -116,21 +117,21 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
   const removeFromCart = useCallback(
     (productId: number, size: string) =>
-      setCart((prev) => prev.filter((c) => !(c.product.id === productId && c.size === size))),
+      setLines((prev) => prev.filter((l) => !(l.id === productId && l.size === size))),
     []
   );
 
   const updateQty = useCallback(
     (productId: number, size: string, qty: number) => {
       if (qty <= 0) return removeFromCart(productId, size);
-      setCart((prev) =>
-        prev.map((c) => (c.product.id === productId && c.size === size ? { ...c, qty: Math.min(9, qty) } : c))
+      setLines((prev) =>
+        prev.map((l) => (l.id === productId && l.size === size ? { ...l, qty: Math.min(9, qty) } : l))
       );
     },
     [removeFromCart]
   );
 
-  const clearCart = useCallback(() => setCart([]), []);
+  const clearCart = useCallback(() => setLines([]), []);
 
   const toggleWish = useCallback((id: number) => {
     setWishlist((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
