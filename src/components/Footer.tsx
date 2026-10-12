@@ -103,7 +103,7 @@ export default function Footer() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] font-bold text-[#f5f9fe]/40">
         <span>© {year} بلوز سيتي — جميع الحقوق محفوظة</span>
-        <a href="#admin" className="hover:text-[#bfe1f8] transition-colors">
+        <a href="admin" className="hover:text-[#bfe1f8] transition-colors">
           دخول الإدارة
         </a>
         <span>صُنع بشغف لكرة القدم الجميلة</span>

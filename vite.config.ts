@@ -1,9 +1,8 @@
-import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig(async () => {
+export default (async () => {
   const plugins = [react(), tailwindcss()];
   try {
     // @ts-expect-error - optional dev-only plugin, absent in trimmed installs
@@ -45,6 +44,10 @@ export default defineConfig(async () => {
           },
         },
       },
+    },
+    // SPA fallback for both main app and admin routes
+    server: {
+      historyApiFallback: true,
     },
   };
 })
