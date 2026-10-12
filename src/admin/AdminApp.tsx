@@ -1,22 +1,26 @@
-import { useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import AdminLogin from './AdminLogin';
 import AdminLayout from './AdminLayout';
 import DashboardPage from './DashboardPage';
 import OrdersPage from './OrdersPage';
-import ProductsPage from './ProductsPage';
+import { ProductsPageSkeleton } from './ProductsStates';
 import CustomersPage from './CustomersPage';
 import SettingsPage from './SettingsPage';
+import { prefetchAdminProducts } from './productCache';
+
+/** Products is the heaviest page, so it is loaded only when opened. */
+const ProductsPage = lazy(() => import('./ProductsPage'));
 
 export default function AdminApp() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => localStorage.getItem('admin-auth') === 'true'
+  );
   const [currentPage, setCurrentPage] = useState('dashboard');
 
+  // Warm the products request while the lazy chunk is still downloading.
   useEffect(() => {
-    const auth = localStorage.getItem('admin-auth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
+    if (isAuthenticated && currentPage === 'products') prefetchAdminProducts();
+  }, [isAuthenticated, currentPage]);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -38,7 +42,11 @@ export default function AdminApp() {
       case 'orders':
         return <OrdersPage />;
       case 'products':
-        return <ProductsPage />;
+        return (
+          <Suspense fallback={<ProductsPageSkeleton />}>
+            <ProductsPage />
+          </Suspense>
+        );
       case 'customers':
         return <CustomersPage />;
       case 'settings':

@@ -90,6 +90,7 @@ export interface ApiProduct {
   stock: number;
   in_stock: boolean;
   is_active: boolean;
+  size: string | null;
   images: ApiProductImage[];
   created_at: string;
   updated_at: string;
@@ -172,7 +173,7 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
     price: Number(raw.price) || 0,
     old_price: raw.old_price != null ? Number(raw.old_price) : null,
     image: resolved || fallbackImage(raw.team),
-    sizes: 'M,L,XL',
+    sizes: raw.size?.trim() ? raw.size : 'M,L,XL',
     condition: 'ممتاز',
     rarity: stock <= 2 ? 'نادر' : stock <= 5 ? 'محدود' : 'متوفر',
     stock,
@@ -187,11 +188,15 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
 }
 
 /**
- * Fetch the catalog. Throws an {@link ApiError} with a user-facing Arabic
- * message for every failure mode (offline, timeout, non-2xx, bad JSON) so
- * callers only have to render `error.message`.
+ * Low-level catalog GET. Resolves the raw, unmodified API rows — including
+ * inactive products — and throws an {@link ApiError} with a user-facing Arabic
+ * message for every failure mode (offline, timeout, non-2xx, bad JSON), so
+ * callers only ever have to render `error.message`.
+ *
+ * The storefront maps these downstream ({@link fetchProducts}); the admin panel
+ * consumes the rows as-is so it can also manage inactive products.
  */
-export async function fetchProducts(): Promise<Product[]> {
+export async function fetchProductList(): Promise<ApiProduct[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -222,7 +227,124 @@ export async function fetchProducts(): Promise<Product[]> {
   }
 
   const rows = Array.isArray(body.data) ? body.data : [];
+  return rows.filter((row): row is ApiProduct => Boolean(row));
+}
+
+/** Active-only, storefront-shaped catalog consumed by the shop components. */
+export async function fetchProducts(): Promise<Product[]> {
+  const rows = await fetchProductList();
   return rows
-    .filter((row) => row && row.is_active !== false)
+    .filter((row) => row.is_active !== false)
     .map((row, index) => mapApiProduct(row, index));
+}
+
+/* ----------------------------------------------------------- write types */
+
+export interface CreateProductInput {
+  name: string;
+  slug: string;
+  team: string;
+  year: number;
+  description: string;
+  price: number;
+  old_price?: number | null;
+  stock: number;
+  /** Comma-separated list of available sizes, e.g. `S,M,L,XL`. */
+  size?: string | null;
+  category_id?: number | null;
+  is_active: boolean;
+  /** New image uploads; existing rows keep their server-side images. */
+  images?: File[];
+}
+
+/**
+ * Pull the most useful message out of a Laravel error response:
+ * `{ message, errors: { field: [msg, …] } }`. Falls back to a status-based
+ * Arabic message so the UI always has something human to show.
+ */
+async function readErrorMessage(response: Response, action: string): Promise<string> {
+  try {
+    const body = (await response.json()) as {
+      message?: string;
+      errors?: Record<string, string[]>;
+    };
+    const firstFieldError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+    if (firstFieldError) return firstFieldError;
+    if (body?.message) return body.message;
+  } catch {
+    /* non-JSON error body — fall through to the status-based message */
+  }
+  if (response.status === 422) return 'بيانات المنتج غير صالحة. تحقّق من الحقول المطلوبة.';
+  if (response.status === 401 || response.status === 403) return 'غير مصرّح لك بتنفيذ هذه العملية.';
+  if (response.status === 413) return 'حجم الصور كبير جداً، حاول اختيار ملفات أصغر.';
+  return `${action} (رمز ${response.status}).`;
+}
+
+/**
+ * Create a product via `POST /api/products` (multipart/form-data). Image files
+ * are sent under `images[]`, which is how Laravel parses an array of uploads.
+ * Throws {@link ApiError} with a user-facing Arabic message on any failure.
+ */
+export async function createProduct(input: CreateProductInput): Promise<ApiProduct> {
+  const form = new FormData();
+  form.append('name', input.name);
+  form.append('slug', input.slug);
+  form.append('team', input.team);
+  form.append('year', String(input.year));
+  form.append('description', input.description);
+  form.append('price', String(input.price));
+  form.append('stock', String(input.stock));
+  form.append('is_active', input.is_active ? '1' : '0');
+  if (input.size != null && input.size.trim()) {
+    form.append('size', input.size.trim());
+  }
+  if (input.old_price != null && Number.isFinite(input.old_price)) {
+    form.append('old_price', String(input.old_price));
+  }
+  if (input.category_id != null && Number.isFinite(input.category_id)) {
+    form.append('category_id', String(input.category_id));
+  }
+  for (const file of input.images ?? []) {
+    form.append('images[]', file);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(PRODUCTS_ENDPOINT, {
+      method: 'POST',
+      // NB: no Content-Type — the browser sets the multipart boundary itself.
+      headers: { Accept: 'application/json' },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق إنشاء المنتج وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response, 'فشل إنشاء المنتج'), response.status);
+  }
+
+  let body: ApiProduct | { data: ApiProduct };
+  try {
+    body = (await response.json()) as ApiProduct | { data: ApiProduct };
+  } catch {
+    throw new ApiError('تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.', response.status);
+  }
+
+  // Accept both a bare product object and a `{ data: {...} }` envelope.
+  const product =
+    body && typeof body === 'object' && 'data' in body ? (body as { data: ApiProduct }).data : body;
+  if (!product || typeof product !== 'object' || typeof (product as ApiProduct).id !== 'number') {
+    throw new ApiError('استجابة غير صالحة من الخادم بعد إنشاء المنتج.', response.status);
+  }
+  return product as ApiProduct;
 }

@@ -1,129 +1,131 @@
-import { useState } from 'react';
-import { MoreVertical, Plus, Search, Upload, X } from 'lucide-react';
-import type { Product } from '../lib/api';
-import { products as initialProducts } from '../lib/catalog';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Pencil, Plus, RefreshCw, Search, Shirt, Trash2 } from 'lucide-react';
+import { formatPrice, resolveImageUrl, type ApiProduct } from '../lib/api';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { resetAdminProducts, useAdminProducts } from './productCache';
+import Pagination from './Pagination';
+import { ProductsEmpty, ProductsError, ProductsPageSkeleton } from './ProductsStates';
 
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [showForm, setShowForm] = useState(false);
+/** The form (and its upload UI) ships in its own chunk, opened on demand. */
+const ProductFormModal = lazy(() => import('./ProductFormModal'));
+
+const PAGE_SIZE = 8;
+
+function primaryImage(product: ApiProduct): string {
+  const images = product.images ?? [];
+  if (images.length === 0) return '';
+  const primary =
+    images.find((img) => img.is_primary) ??
+    [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
+  return resolveImageUrl(primary.path);
+}
+
+interface ManagerProps {
+  /** A remount after the user hits refresh; used to surface a success toast. */
+  reloaded: boolean;
+  onReload: () => void;
+  showToast: (message: string) => void;
+}
+
+/**
+ * Data-bound view. Suspends on `useAdminProducts()` so the parent `<Suspense>`
+ * shows the skeleton until the API responds.
+ */
+function ProductsManager({ reloaded, onReload, showToast }: ManagerProps) {
+  const apiProducts = useAdminProducts();
+  const [items, setItems] = useState<ApiProduct[]>(apiProducts);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [page, setPage] = useState(1);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<ApiProduct | null>(null);
 
-  const [formData, setFormData] = useState({
-    name_ar: '',
-    slug: '',
-    team: '',
-    year: '',
-    description_ar: '',
-    price: '',
-    old_price: '',
-    stock: '',
-    category: 'منتخبات',
-    is_active: true,
-    image: '',
-  });
+  // Confirm a manual refresh landed (the initial load stays silent).
+  useEffect(() => {
+    if (reloaded) showToast('تم تحديث قائمة المنتجات بنجاح');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name_ar.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.team.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.team.toLowerCase().includes(q) ||
+        p.slug.toLowerCase().includes(q)
+    );
+  }, [items, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Clamp during render so the page stays valid after filtering or deleting rows.
+  const currentPage = Math.min(page, totalPages);
+
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
+console.log("===== paged =======",paged);
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
+
+  const openCreate = useCallback(() => {
+    setEditing(null);
+    setFormOpen(true);
+  }, []);
+
+  const openEdit = useCallback((product: ApiProduct) => {
+    setEditing(product);
+    setFormOpen(true);
+  }, []);
+
+  const closeForm = useCallback(() => {
+    setFormOpen(false);
+    setEditing(null);
+  }, []);
+
+  const handleCreated = useCallback(
+    (product: ApiProduct) => {
+      setItems((prev) => [product, ...prev]);
+      showToast('تم إنشاء المنتج بنجاح');
+    },
+    [showToast]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdated = useCallback(
+    (product: ApiProduct) => {
+      setItems((prev) => prev.map((p) => (p.id === product.id ? product : p)));
+      showToast('تم تحديث المنتج بنجاح');
+    },
+    [showToast]
+  );
 
-    const newProduct: Product = {
-      id: editingProduct?.id || products.length + 1,
-      name_ar: formData.name_ar,
-      team: formData.team,
-      year: Number(formData.year),
-      era: Number(formData.year) >= 1960 && Number(formData.year) < 1970 ? 'الستينات' :
-           Number(formData.year) >= 1970 && Number(formData.year) < 1980 ? 'السبعينات' :
-           Number(formData.year) >= 1980 && Number(formData.year) < 1990 ? 'الثمانينات' : 'التسعينات',
-      price: Number(formData.price),
-      old_price: formData.old_price ? Number(formData.old_price) : undefined,
-      image: formData.image || '/images/placeholder.webp',
-      sizes: 'M,L,XL',
-      condition: 'ممتاز',
-      rarity: 'محدود',
-      stock: Number(formData.stock),
-      rating: 4.5,
-      reviews_count: 0,
-      description_ar: formData.description_ar,
-      category: formData.category as 'منتخبات' | 'أندية',
-      featured: false,
-      brand: 'Adidas',
-    };
-
-    if (editingProduct) {
-      setProducts(products.map((p) => (p.id === editingProduct.id ? newProduct : p)));
-    } else {
-      setProducts([newProduct, ...products]);
-    }
-
-    setShowForm(false);
-    setEditingProduct(null);
-    resetForm();
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name_ar: '',
-      slug: '',
-      team: '',
-      year: '',
-      description_ar: '',
-      price: '',
-      old_price: '',
-      stock: '',
-      category: 'منتخبات',
-      is_active: true,
-      image: '',
-    });
-  };
-
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name_ar: product.name_ar,
-      slug: product.name_ar.toLowerCase().replace(/\s+/g, '-'),
-      team: product.team,
-      year: String(product.year),
-      description_ar: product.description_ar,
-      price: String(product.price),
-      old_price: product.old_price ? String(product.old_price) : '',
-      stock: String(product.stock),
-      category: product.category,
-      is_active: true,
-      image: product.image,
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-      setProducts(products.filter((p) => p.id !== id));
-    }
-  };
+  const handleDelete = useCallback(
+    (product: ApiProduct) => {
+      if (!confirm(`هل أنت متأكد من حذف «${product.name}»؟`)) return;
+      setItems((prev) => prev.filter((p) => p.id !== product.id));
+      showToast('تم حذف المنتج بنجاح');
+    },
+    [showToast]
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-black text-2xl text-[#0f2f52]">المنتجات</h1>
-          <p className="text-sm font-bold text-gray-500">إدارة مخزون المنتجات</p>
+          <p className="text-sm font-bold text-gray-500">
+            {items.length > 0 ? `${items.length} منتج في المخزون` : 'إدارة مخزون المنتجات'}
+          </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setEditingProduct(null);
-            setShowForm(true);
-          }}
-          className="w-full sm:w-auto bg-[#0f2f52] hover:bg-[#1565c0] text-white font-black px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all"
-        >
-          <Plus size={18} />
-          إنشاء منتج جديد
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          
+          <button
+            onClick={openCreate}
+            className="flex-1 sm:flex-none bg-[#0f2f52] hover:bg-[#1565c0] text-white font-black px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all"
+          >
+            <Plus size={18} /> إنشاء منتج جديد
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -134,259 +136,178 @@ export default function ProductsPage() {
               type="text"
               placeholder="بحث المنتجات..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
               className="w-full bg-gray-100 rounded-xl pl-4 pr-10 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#2f9de4]"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider">
-                  الاسم
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider">
-                  الرابط
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider">
-                  السنة
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider">
-                  الحالة
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider">
-                  الإجراءات
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50 transition-all">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={product.image}
-                        alt={product.name_ar}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div>
-                        <div className="font-black text-sm text-[#0f2f52]">{product.name_ar}</div>
-                        <div className="text-xs font-bold text-gray-500">{product.team}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
-                    {product.name_ar.toLowerCase().replace(/\s+/g, '-')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
-                    {product.year}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700">
-                      نشط
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="relative">
-                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-all">
-                        <MoreVertical size={18} className="text-gray-600" />
-                      </button>
-                      <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-gray-200 py-2 hidden group-hover:block">
-                        <button
-                          onClick={() => handleEdit(product)}
-                          className="w-full px-4 py-2 text-right text-sm font-bold text-gray-700 hover:bg-gray-50"
-                        >
-                          تعديل
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="w-full px-4 py-2 text-right text-sm font-bold text-red-600 hover:bg-red-50"
-                        >
-                          حذف
-                        </button>
-                      </div>
-                    </div>
-                  </td>
+        {items.length === 0 ? (
+          <ProductsEmpty onCreate={openCreate} />
+        ) : filtered.length === 0 ? (
+          <ProductsEmpty query={searchTerm} onClearSearch={() => setSearchTerm('')} />
+        ) : (
+          <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  {['المنتج', 'الرابط', 'السنة', 'السعر', 'المخزون', 'الحالة', 'الإجراءات'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {paged.map((product) => {
+                  const image = primaryImage(product);
+                  return (
+                    <tr key={product.id} className="hover:bg-gray-50 transition-all">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {image ? (
+                            <img
+                              src={image}
+                              alt={product.name}
+                              loading="lazy"
+                              className="w-12 h-12 rounded-lg object-cover bg-gray-100"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 grid place-items-center">
+                              <Shirt size={18} className="text-gray-400" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-black text-sm text-[#0f2f52]">{product.name}</div>
+                            <div className="text-xs font-bold text-gray-500">{product.team}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600" dir="ltr">
+                        {product.slug}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
+                        {product.year || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
+                        {formatPrice(product.price)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
+                        {product.stock}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
+                            product.is_active
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          {product.is_active ? 'نشط' : 'معطّل'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEdit(product)}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                            aria-label={`تعديل ${product.name}`}
+                          >
+                            <Pencil size={17} className="text-gray-600" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product)}
+                            className="p-2 hover:bg-red-50 rounded-lg transition-all"
+                            aria-label={`حذف ${product.name}`}
+                          >
+                            <Trash2 size={17} className="text-red-600" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-200">
+            <p className="text-xs font-bold text-gray-500">
+              عرض {rangeStart}–{rangeEnd} من {filtered.length} منتج
+            </p>
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+          </>
+        )}
       </div>
 
-      {/* Create/Edit Product Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="font-black text-xl text-[#0f2f52]">
-                {editingProduct ? 'تعديل المنتج' : 'إنشاء منتج جديد'}
-              </h2>
-              <button
-                onClick={() => setShowForm(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
-              >
-                <X size={20} className="text-gray-600" />
-              </button>
-            </div>
+      {formOpen && (
+        <Suspense fallback={null}>
+          <ProductFormModal
+            product={editing}
+            onClose={closeForm}
+            onCreated={handleCreated}
+            onUpdated={handleUpdated}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الاسم</label>
-                  <input
-                    type="text"
-                    value={formData.name_ar}
-                    onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
+export default function ProductsPage() {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
 
-                <div className="col-span-2">
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الرابط</label>
-                  <input
-                    type="text"
-                    value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
 
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الفريق</label>
-                  <input
-                    type="text"
-                    value={formData.team}
-                    onChange={(e) => setFormData({ ...formData, team: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">السنة</label>
-                  <input
-                    type="number"
-                    value={formData.year}
-                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
+  const reload = useCallback(() => {
+    resetAdminProducts();
+    setReloadKey((k) => k + 1);
+  }, []);
 
-                <div className="col-span-2">
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الوصف</label>
-                  <textarea
-                    value={formData.description_ar}
-                    onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                    rows={3}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4] resize-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">السعر (دج)</label>
-                  <input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">السعر القديم</label>
-                  <input
-                    type="number"
-                    value={formData.old_price}
-                    onChange={(e) => setFormData({ ...formData, old_price: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">المخزون</label>
-                  <input
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الفئة</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                  >
-                    <option value="منتخبات">منتخبات</option>
-                    <option value="أندية">أندية</option>
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-black text-[#0f2f52] mb-1.5">رابط الصورة</label>
-                  <input
-                    type="text"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="/images/jersey-name.webp"
-                    className="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-[#2f9de4]"
-                  />
-                </div>
-
-                <div className="col-span-2 flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-5 h-5 accent-[#0f2f52]"
-                    />
-                    <span className="text-sm font-black text-[#0f2f52]">نشط</span>
-                  </label>
-                </div>
-
-                <div className="col-span-2">
-                  <button
-                    type="button"
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-[#0f2f52] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
-                  >
-                    <Upload size={18} />
-                    رفع الصور
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-[#0f2f52] font-black py-3 rounded-xl transition-all"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-[#0f2f52] hover:bg-[#1565c0] text-white font-black py-3 rounded-xl transition-all"
-                >
-                  {editingProduct ? 'تحديث المنتج' : 'إنشاء المنتج'}
-                </button>
-              </div>
-            </form>
-          </div>
+  return (
+    <div className="space-y-6">
+      {toast && (
+        <div
+          role="status"
+          className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 font-black text-sm px-4 py-3 rounded-xl"
+        >
+          <CheckCircle2 size={18} /> {toast}
         </div>
       )}
+
+      <ErrorBoundary
+        onReset={resetAdminProducts}
+        fallback={(error, reset) => (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <ProductsError error={error} onRetry={reset} />
+          </div>
+        )}
+      >
+        <Suspense fallback={<ProductsPageSkeleton />}>
+          <ProductsManager
+            key={reloadKey}
+            reloaded={reloadKey > 0}
+            onReload={reload}
+            showToast={showToast}
+          />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
