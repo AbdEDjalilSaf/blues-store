@@ -114,8 +114,7 @@ export class ApiError extends Error {
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
-/**
- * Placeholder artwork used only while a product has no image of its own — the
+/** Placeholder artwork used only while a product has no image of its own — the
  * seed catalog ships with an empty `images` array. Picked deterministically
  * from the team name so a grid of image-less products still looks varied.
  */
@@ -136,7 +135,8 @@ function hashString(value: string): number {
   return h;
 }
 
-function fallbackImage(team: string): string {
+/** Deterministic placeholder URL for a product without a loadable image. */
+export function fallbackImage(team: string): string {
   return PLACEHOLDER_IMAGES[hashString(team || 'jersey') % PLACEHOLDER_IMAGES.length];
 }
 

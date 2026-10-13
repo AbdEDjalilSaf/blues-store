@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
 import { AlertCircle, ImagePlus, Loader2, Upload, X } from 'lucide-react';
-import { createProduct, resolveImageUrl, type ApiProduct } from '../lib/api';
+import { createProduct, fallbackImage, resolveImageUrl, type ApiProduct } from '../lib/api';
 
 interface Props {
   /** `null` creates a new product (POST); an existing row edits it locally. */
@@ -27,6 +27,13 @@ function slugify(value: string): string {
 function discountFor(price: number, oldPrice: number): number {
   if (!oldPrice || oldPrice <= price) return 0;
   return Math.round(((oldPrice - price) / oldPrice) * 100);
+}
+
+/** Swap to a placeholder when a stored image file can't be loaded. */
+function handleImageError(event: SyntheticEvent<HTMLImageElement>, team: string): void {
+  const img = event.currentTarget;
+  img.onerror = null;
+  img.src = fallbackImage(team);
 }
 
 /** Create/edit form. Lazy-loaded (own chunk) so upload UI isn't in the page. */
@@ -314,6 +321,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                       key={img.id}
                       src={resolveImageUrl(img.path)}
                       alt=""
+                      onError={(e) => handleImageError(e, product.team)}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-200"
                     />
                   ))}

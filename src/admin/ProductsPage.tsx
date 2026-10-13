@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Pencil, Plus, RefreshCw, Search, Shirt, Trash2 } from 'lucide-react';
-import { formatPrice, resolveImageUrl, type ApiProduct } from '../lib/api';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { CheckCircle2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { formatPrice, resolveImageUrl, fallbackImage, type ApiProduct } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { resetAdminProducts, useAdminProducts } from './productCache';
 import Pagination from './Pagination';
@@ -10,27 +10,6 @@ import { ProductsEmpty, ProductsError, ProductsPageSkeleton } from './ProductsSt
 const ProductFormModal = lazy(() => import('./ProductFormModal'));
 
 const PAGE_SIZE = 8;
-
-const PLACEHOLDER_IMAGES = [
-  '/images/jersey-brazil.webp',
-  '/images/jersey-argentina.webp',
-  '/images/jersey-ajax.webp',
-  '/images/jersey-milan.webp',
-  '/images/jersey-barca.webp',
-  '/images/jersey-liverpool.webp',
-  '/images/jersey-france.webp',
-  '/images/jersey-italy.webp',
-];
-
-function hashString(value: string): number {
-  let h = 0;
-  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-function fallbackImage(team: string): string {
-  return PLACEHOLDER_IMAGES[hashString(team || 'jersey') % PLACEHOLDER_IMAGES.length];
-}
 
 function primaryImage(product: ApiProduct): string {
   const images = product.images ?? [];
@@ -42,10 +21,14 @@ function primaryImage(product: ApiProduct): string {
   return resolved || fallbackImage(product.team);
 }
 
+/** Swap to the deterministic placeholder when the stored file can't be loaded. */
+function handleImageError(event: SyntheticEvent<HTMLImageElement>, team: string): void {
+  const img = event.currentTarget;
+  img.onerror = null;
+  img.src = fallbackImage(team);
+}
+
 interface ManagerProps {
-  /** A remount after the user hits refresh; used to surface a success toast. */
-  reloaded: boolean;
-  onReload: () => void;
   showToast: (message: string) => void;
 }
 
@@ -53,19 +36,13 @@ interface ManagerProps {
  * Data-bound view. Suspends on `useAdminProducts()` so the parent `<Suspense>`
  * shows the skeleton until the API responds.
  */
-function ProductsManager({ reloaded, onReload, showToast }: ManagerProps) {
+function ProductsManager({ showToast }: ManagerProps) {
   const apiProducts = useAdminProducts();
   const [items, setItems] = useState<ApiProduct[]>(apiProducts);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ApiProduct | null>(null);
-
-  // Confirm a manual refresh landed (the initial load stays silent).
-  useEffect(() => {
-    if (reloaded) showToast('تم تحديث قائمة المنتجات بنجاح');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -86,7 +63,7 @@ function ProductsManager({ reloaded, onReload, showToast }: ManagerProps) {
     () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filtered, currentPage]
   );
-console.log("===== paged =======",paged);
+
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
@@ -198,6 +175,7 @@ console.log("===== paged =======",paged);
                             src={image}
                             alt={product.name}
                             loading="lazy"
+                            onError={(e) => handleImageError(e, product.team)}
                             className="w-12 h-12 rounded-lg object-cover bg-gray-100"
                           />
                           <div>
@@ -279,7 +257,6 @@ console.log("===== paged =======",paged);
 }
 
 export default function ProductsPage() {
-  const [reloadKey, setReloadKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -290,11 +267,6 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
-
-  const reload = useCallback(() => {
-    resetAdminProducts();
-    setReloadKey((k) => k + 1);
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -316,12 +288,7 @@ export default function ProductsPage() {
         )}
       >
         <Suspense fallback={<ProductsPageSkeleton />}>
-          <ProductsManager
-            key={reloadKey}
-            reloaded={reloadKey > 0}
-            onReload={reload}
-            showToast={showToast}
-          />
+          <ProductsManager showToast={showToast} />
         </Suspense>
       </ErrorBoundary>
     </div>
