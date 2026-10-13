@@ -12,6 +12,10 @@ interface Props {
   onUpdated: (product: ApiProduct) => void;
 }
 
+/** A product needs a small gallery, but the server caps uploads per request. */
+const MIN_IMAGES = 2;
+const MAX_IMAGES = 8;
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -59,7 +63,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
 
   const addFiles = (picked: FileList | null) => {
     if (!picked?.length) return;
-    setFiles((prev) => [...prev, ...Array.from(picked)]);
+    setFiles((prev) => [...prev, ...Array.from(picked)].slice(0, MAX_IMAGES));
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -74,6 +78,8 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     if (!Number.isFinite(price) || price <= 0) return 'الرجاء إدخال سعر صحيح أكبر من صفر.';
     const stock = Number(form.stock);
     if (!Number.isInteger(stock) || stock < 0) return 'الرجاء إدخال كمية مخزون صحيحة.';
+    if (isNew && files.length < MIN_IMAGES) return 'الرجاء رفع صورتين على الأقل للمنتج.';
+    if (files.length > MAX_IMAGES) return `لا يمكن رفع أكثر من ${MAX_IMAGES} صور.`;
     return null;
   };
 
@@ -349,14 +355,18 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={submitting}
+                disabled={submitting || files.length >= MAX_IMAGES}
                 className="w-full bg-gray-100 hover:bg-gray-200 text-[#0f2f52] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-60"
               >
                 <ImagePlus size={18} />
-                {files.length > 0 ? `تم اختيار ${files.length} صورة` : 'رفع الصور'}
+                {files.length > 0
+                  ? `تم اختيار ${files.length} صورة`
+                  : `رفع الصور (${MIN_IMAGES}–${MAX_IMAGES})`}
               </button>
               <p className="text-xs font-bold text-gray-400 mt-1">
-                {isNew ? 'تُرفع الصور مع المنتج الجديد.' : 'تُدار صور المنتجات الحالية من الخادم.'}
+                {isNew
+                  ? `ارفع من ${MIN_IMAGES} إلى ${MAX_IMAGES} صور مع المنتج الجديد.`
+                  : 'تُدار صور المنتجات الحالية من الخادم.'}
               </p>
             </div>
 

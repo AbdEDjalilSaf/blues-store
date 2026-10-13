@@ -11,13 +11,35 @@ const ProductFormModal = lazy(() => import('./ProductFormModal'));
 
 const PAGE_SIZE = 8;
 
+const PLACEHOLDER_IMAGES = [
+  '/images/jersey-brazil.webp',
+  '/images/jersey-argentina.webp',
+  '/images/jersey-ajax.webp',
+  '/images/jersey-milan.webp',
+  '/images/jersey-barca.webp',
+  '/images/jersey-liverpool.webp',
+  '/images/jersey-france.webp',
+  '/images/jersey-italy.webp',
+];
+
+function hashString(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function fallbackImage(team: string): string {
+  return PLACEHOLDER_IMAGES[hashString(team || 'jersey') % PLACEHOLDER_IMAGES.length];
+}
+
 function primaryImage(product: ApiProduct): string {
   const images = product.images ?? [];
-  if (images.length === 0) return '';
+  if (images.length === 0) return fallbackImage(product.team);
   const primary =
     images.find((img) => img.is_primary) ??
     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
-  return resolveImageUrl(primary.path);
+  const resolved = resolveImageUrl(primary.path);
+  return resolved || fallbackImage(product.team);
 }
 
 interface ManagerProps {
@@ -172,18 +194,12 @@ console.log("===== paged =======",paged);
                     <tr key={product.id} className="hover:bg-gray-50 transition-all">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          {image ? (
-                            <img
-                              src={image}
-                              alt={product.name}
-                              loading="lazy"
-                              className="w-12 h-12 rounded-lg object-cover bg-gray-100"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-gray-100 grid place-items-center">
-                              <Shirt size={18} className="text-gray-400" />
-                            </div>
-                          )}
+                          <img
+                            src={image}
+                            alt={product.name}
+                            loading="lazy"
+                            className="w-12 h-12 rounded-lg object-cover bg-gray-100"
+                          />
                           <div>
                             <div className="font-black text-sm text-[#0f2f52]">{product.name}</div>
                             <div className="text-xs font-bold text-gray-500">{product.team}</div>
