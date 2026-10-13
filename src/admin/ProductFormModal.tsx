@@ -330,7 +330,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                         className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 disabled:opacity-40"
                         aria-label="إزالة الصورة"
                       >
-                        <X size={12} />
+                        <X size={12} /> 
                       </button>
                     </div>
                   ))}
