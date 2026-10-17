@@ -1,5 +1,5 @@
-﻿import { memo } from 'react';
-import { Eye, Star } from 'lucide-react';
+﻿import { memo, useState } from 'react';
+import { Eye, Shirt, Star } from 'lucide-react';
 import { formatPrice, parseSizes, type Product } from '../lib/api';
 import { useShopActions } from '../store/shop';
 
@@ -10,6 +10,7 @@ interface Props {
 
 function ProductCard({ p, onView }: Props) {
   const { addToCart } = useShopActions();
+  const [imgError, setImgError] = useState(false);
 
   const sizes = parseSizes(p.sizes);
   const discount = p.old_price ? Math.round((1 - Number(p.price) / Number(p.old_price)) * 100) : 0;
@@ -18,17 +19,24 @@ function ProductCard({ p, onView }: Props) {
   return (
     <article className="group bg-white rounded-3xl overflow-hidden border-2 border-[#0f2f52]/10 hover:border-[#2f9de4] hover:shadow-[0_20px_50px_rgba(18,41,28,.15)] transition-all duration-300 hover:-translate-y-1.5 flex flex-col">
       <div className="relative overflow-hidden bg-[#e7eff8] cursor-pointer" onClick={() => onView(p)}>
-        <img
-          src={p.image}
-          alt={`${p.name_ar} — قميص ${p.team} ${p.year} فينتاج أصلي`}
-          loading="lazy"
-          decoding="async"
-          width={640}
-          height={640}
-          fetchPriority="low"
-          draggable={false}
-          className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {imgError ? (
+          <div className="w-full aspect-square grid place-items-center bg-[#e7eff8]">
+            <Shirt size={48} className="text-gray-400" />
+          </div>
+        ) : (
+          <img
+            src={p.image}
+            alt={`${p.name_ar} — قميص ${p.team} ${p.year} فينتاج أصلي`}
+            loading="lazy"
+            decoding="async"
+            width={640}
+            height={640}
+            fetchPriority="low"
+            draggable={false}
+            onError={() => setImgError(true)}
+            className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        )}
         <div className="absolute top-3 right-3 flex flex-col gap-1.5">
           {p.badge && <span className="bg-[#1565c0] text-white text-[11px] font-black px-3 py-1 rounded-full shadow">{p.badge}</span>}
           {discount > 0 && <span className="bg-[#2f9de4] text-[#0f2f52] text-[11px] font-black px-3 py-1 rounded-full shadow">خصم {discount}%</span>}

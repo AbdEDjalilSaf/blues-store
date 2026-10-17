@@ -167,6 +167,7 @@ function ProductsManager({ showToast }: ManagerProps) {
               <tbody className="divide-y divide-gray-200">
                 {paged.map((product) => {
                   const image = primaryImage(product);
+                  console.log("==== image ====",image);
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-all">
                       <td className="px-6 py-4">

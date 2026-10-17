@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, Heart, Minus, Plus, Ruler, ShoppingBag, Star, Truck, X } from 'lucide-react';
+import { BadgeCheck, Heart, Minus, Plus, Ruler, Shirt, ShoppingBag, Star, Truck, X } from 'lucide-react';
 import { formatPrice, parseSizes, type Product, type Review } from '../lib/api';
 import { loadReviews, saveReview } from '../lib/catalog';
 import { useShopActions, useWishlist } from '../store/shop';
@@ -23,6 +23,7 @@ export default function ProductModal({ p, onClose }: Props) {
   const [reviews, setReviews] = useState<Review[]>(() => loadReviews(p.id));
   const [form, setForm] = useState({ author: '', rating: 5, text: '' });
   const [sending, setSending] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const panel = useRef<HTMLDivElement | null>(null);
 
   // Scroll lock + Escape to close. Pure external-system work, no setState.
@@ -76,7 +77,22 @@ export default function ProductModal({ p, onClose }: Props) {
         <button onClick={onClose} className="absolute top-3 left-3 z-10 w-10 h-10 grid place-items-center rounded-full bg-[#0f2f52] text-white hover:bg-[#1565c0]" aria-label="إغلاق"><X size={20} /></button>
         <div className="grid md:grid-cols-2">
           <div className="relative bg-[#e7eff8] p-4 md:p-6">
-            <img src={p.image} alt={p.name_ar} loading="lazy" decoding="async" width={640} height={640} className="w-full aspect-square object-cover rounded-2xl border-2 border-[#0f2f52]/10 shadow" />
+            {imgError ? (
+              <div className="w-full aspect-square grid place-items-center bg-[#e7eff8] rounded-2xl border-2 border-[#0f2f52]/10 shadow">
+                <Shirt size={64} className="text-gray-400" />
+              </div>
+            ) : (
+              <img
+                src={p.image}
+                alt={p.name_ar}
+                loading="lazy"
+                decoding="async"
+                width={640}
+                height={640}
+                onError={() => setImgError(true)}
+                className="w-full aspect-square object-cover rounded-2xl border-2 border-[#0f2f52]/10 shadow"
+              />
+            )}
             <div className="absolute top-6 right-6 md:top-8 md:right-8 flex flex-col gap-1.5">
               {p.badge && <span className="bg-[#1565c0] text-white text-[11px] font-black px-3 py-1 rounded-full shadow">{p.badge}</span>}
               {discount > 0 && <span className="bg-[#2f9de4] text-[#0f2f52] text-[11px] font-black px-3 py-1 rounded-full shadow">خصم {discount}%</span>}
@@ -97,7 +113,6 @@ export default function ProductModal({ p, onClose }: Props) {
             </div>
             <p className="text-[14px] leading-7 font-medium text-[#0f2f52]/75 mb-4">{p.description_ar}</p>
             <div className="flex flex-wrap gap-2 mb-4 text-[12px] font-black">
-              <span className="px-3 py-1.5 rounded-full bg-[#0f2f52] text-[#f5f9fe]">الحقبة: {p.era}</span>
               <span className="px-3 py-1.5 rounded-full bg-white border border-[#0f2f52]/15 text-[#0f2f52]">الحالة: {p.condition}</span>
               <span className="px-3 py-1.5 rounded-full bg-[#2f9de4]/15 border border-[#2f9de4]/40 text-[#0f4c9c]">الندرة: {p.rarity}</span>
             </div>

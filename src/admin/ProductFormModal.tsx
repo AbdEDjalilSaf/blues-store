@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
-import { AlertCircle, ImagePlus, Loader2, Upload, X } from 'lucide-react';
-import { createProduct, fallbackImage, resolveImageUrl, type ApiProduct } from '../lib/api';
+import { AlertCircle, CheckCircle2, ImagePlus, Loader2, Upload, X } from 'lucide-react';
+import { createProduct, fallbackImage, resolveImageUrl, updateProduct, type ApiProduct } from '../lib/api';
 
 interface Props {
   /** `null` creates a new product (POST); an existing row edits it locally. */
@@ -56,6 +56,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -88,6 +89,12 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     if (isNew && files.length < MIN_IMAGES) return 'الرجاء رفع صورتين على الأقل للمنتج.';
     if (files.length > MAX_IMAGES) return `لا يمكن رفع أكثر من ${MAX_IMAGES} صور.`;
     return null;
+  };
+
+  const resetForm = () => {
+    setError('');
+    setSuccess(false);
+    setSubmitting(false);
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -127,26 +134,27 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
           images: files,
         });
         onCreated(created);
+        setSuccess(true);
+        setTimeout(() => onClose(), 1500);
       } else {
-        const now = new Date().toISOString();
-        onUpdated({
-          ...product,
+        const updated = await updateProduct(product!.id, {
           name,
           slug,
           team: form.team.trim(),
           year: Number(form.year),
           description: form.description.trim(),
           price,
-          old_price: oldPrice,
-          discount_percent: oldPrice != null ? discountFor(price, oldPrice) : 0,
+          old_price: oldPrice != null && Number.isFinite(oldPrice) ? oldPrice : null,
           stock,
           size: form.size.trim() || null,
-          in_stock: stock > 0,
+          category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
           is_active: form.is_active,
-          updated_at: now,
+          images: files.length > 0 ? files : undefined,
         });
+        onUpdated(updated);
+        setSuccess(true);
+        setTimeout(() => onClose(), 1500);
       }
-      onClose();
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'تعذّر حفظ المنتج. حاول مجدداً.');
       setSubmitting(false);
@@ -391,6 +399,16 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
               </label>
             </div>
           </div>
+
+          {success && (
+            <div
+              role="status"
+              className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-bold px-4 py-3 rounded-xl"
+            >
+              <CheckCircle2 size={18} className="shrink-0" />
+              <span>{isNew ? 'تم إنشاء المنتج بنجاح!' : 'تم تحديث المنتج بنجاح!'}</span>
+            </div>
+          )}
 
           {error && (
             <div

@@ -275,17 +275,14 @@ async function readErrorMessage(response: Response, action: string): Promise<str
     /* non-JSON error body — fall through to the status-based message */
   }
   if (response.status === 422) return 'بيانات المنتج غير صالحة. تحقّق من الحقول المطلوبة.';
+  if (response.status === 404) return 'المنتج غير موجود. ربما تم حذفه من الخادم.';
   if (response.status === 401 || response.status === 403) return 'غير مصرّح لك بتنفيذ هذه العملية.';
   if (response.status === 413) return 'حجم الصور كبير جداً، حاول اختيار ملفات أصغر.';
   return `${action} (رمز ${response.status}).`;
 }
 
-/**
- * Create a product via `POST /api/products` (multipart/form-data). Image files
- * are sent under `images[]`, which is how Laravel parses an array of uploads.
- * Throws {@link ApiError} with a user-facing Arabic message on any failure.
- */
-export async function createProduct(input: CreateProductInput): Promise<ApiProduct> {
+/** Shared multipart body for create/update; `images[]` only when files are picked. */
+function buildProductForm(input: CreateProductInput): FormData {
   const form = new FormData();
   form.append('name', input.name);
   form.append('slug', input.slug);
@@ -307,14 +304,23 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
   for (const file of input.images ?? []) {
     form.append('images[]', file);
   }
+  return form;
+}
 
+/** POST/PATCH shared fetch: multipart body, timeout, envelope, Arabic errors. */
+async function sendProductForm(
+  url: string,
+  method: 'POST' | 'PATCH',
+  form: FormData,
+  opts: { timeoutLabel: string; failureAction: string; parseError: string; invalidError: string }
+): Promise<ApiProduct> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   let response: Response;
   try {
-    response = await fetch(PRODUCTS_ENDPOINT, {
-      method: 'POST',
+    response = await fetch(url, {
+      method,
       // NB: no Content-Type — the browser sets the multipart boundary itself.
       headers: { Accept: 'application/json' },
       body: form,
@@ -322,7 +328,7 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new ApiError('استغرق إنشاء المنتج وقتاً طويلاً. حاول مرة أخرى.');
+      throw new ApiError(`استغرق ${opts.timeoutLabel} وقتاً طويلاً. حاول مرة أخرى.`);
     }
     throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
   } finally {
@@ -330,21 +336,68 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
   }
 
   if (!response.ok) {
-    throw new ApiError(await readErrorMessage(response, 'فشل إنشاء المنتج'), response.status);
+    throw new ApiError(await readErrorMessage(response, opts.failureAction), response.status);
   }
 
   let body: ApiProduct | { data: ApiProduct };
   try {
     body = (await response.json()) as ApiProduct | { data: ApiProduct };
   } catch {
-    throw new ApiError('تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.', response.status);
+    throw new ApiError(opts.parseError, response.status);
   }
 
   // Accept both a bare product object and a `{ data: {...} }` envelope.
   const product =
     body && typeof body === 'object' && 'data' in body ? (body as { data: ApiProduct }).data : body;
   if (!product || typeof product !== 'object' || typeof (product as ApiProduct).id !== 'number') {
-    throw new ApiError('استجابة غير صالحة من الخادم بعد إنشاء المنتج.', response.status);
+    throw new ApiError(opts.invalidError, response.status);
   }
   return product as ApiProduct;
+}
+
+/**
+ * Create a product via `POST /api/products` (multipart/form-data). Image files
+ * are sent under `images[]`, which is how Laravel parses an array of uploads.
+ * Throws {@link ApiError} with a user-facing Arabic message on any failure.
+ */
+export async function createProduct(input: CreateProductInput): Promise<ApiProduct> {
+  const form = buildProductForm(input);
+  try {
+    return await sendProductForm(
+      PRODUCTS_ENDPOINT,
+      'POST',
+      form,
+      'إنشاء المنتج',
+      'فشل إنشاء المنتج'
+    );
+  } catch (err) {
+    // Preserve the creation-specific wording from the original implementation.
+    if (err instanceof ApiError && err.message.startsWith('تم التنفيذ')) {
+      throw new ApiError('تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.', err.status);
+    }
+    if (err instanceof ApiError && err.message.startsWith('استجابة غير صالحة')) {
+      throw new ApiError('استجابة غير صالحة من الخادم بعد إنشاء المنتج.', err.status);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Update a product via `PATCH /api/products/{idOrSlug}` (multipart/form-data).
+ * `images[]` is only appended when new files are picked, so the server keeps
+ * existing images otherwise (replace semantics when files are sent).
+ * Throws {@link ApiError} with a user-facing Arabic message on any failure.
+ */
+export async function updateProduct(
+  idOrSlug: number | string,
+  input: CreateProductInput
+): Promise<ApiProduct> {
+  const form = buildProductForm(input);
+  return sendProductForm(
+    `${PRODUCTS_ENDPOINT}/${encodeURIComponent(String(idOrSlug))}`,
+    'PATCH',
+    form,
+    'حفظ المنتج',
+    'فشل تحديث المنتج'
+  );
 }

@@ -77,6 +77,8 @@ export default function ShopSection({ products, search, onView }: Props) {
     return l;
   }, [products, deferredSearch, era, cat, sort, onlyAvail, showWish, wishlist]);
 
+  console.log("============= list ==============",list)
+
   return (
     <Reveal as="section" effect="fade-up" id="shop" className="bg-[#f5f9fe] py-12 md:py-20 scroll-mt-20" aria-labelledby="shop-heading">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
@@ -144,19 +146,7 @@ export default function ShopSection({ products, search, onView }: Props) {
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-dashed border-[#0f2f52]/15">
-                <span className="text-[12px] font-black text-[#0f2f52]/50">الحقبة:</span>
-                {eras.map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => setEra(e)}
-                    aria-pressed={era === e}
-                    className={`px-4 py-2 rounded-full text-[13px] font-black transition-all border-2 ${era === e ? 'bg-[#0f2f52] text-white border-[#0f2f52]' : 'bg-[#f5f9fe] text-[#0f2f52] border-transparent hover:border-[#0f2f52]/20'}`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
+             
             </div>
 
             <div aria-live="polite">
