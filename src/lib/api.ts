@@ -238,6 +238,51 @@ export async function fetchProducts(): Promise<Product[]> {
     .map((row, index) => mapApiProduct(row, index));
 }
 
+/**
+ * Fetch a single product by ID or slug. Returns the raw API product with images.
+ * Used by the admin dashboard for editing.
+ */
+export async function fetchProduct(idOrSlug: number | string): Promise<ApiProduct> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${PRODUCTS_ENDPOINT}/${encodeURIComponent(String(idOrSlug))}`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق تحميل المنتج وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new ApiError('المنتج غير موجود. ربما تم حذفه من الخادم.', response.status);
+    }
+    throw new ApiError(`فشل تحميل المنتج (رمز ${response.status}).`, response.status);
+  }
+
+  let body: ApiProduct | { data: ApiProduct };
+  try {
+    body = (await response.json()) as ApiProduct | { data: ApiProduct };
+  } catch {
+    throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+  }
+
+  const product =
+    body && typeof body === 'object' && 'data' in body ? (body as { data: ApiProduct }).data : body;
+  if (!product || typeof product !== 'object' || typeof (product as ApiProduct).id !== 'number') {
+    throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+  }
+  return product as ApiProduct;
+}
+
 /* ----------------------------------------------------------- write types */
 
 export interface CreateProductInput {
@@ -367,17 +412,14 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
       PRODUCTS_ENDPOINT,
       'POST',
       form,
-      'إنشاء المنتج',
-      'فشل إنشاء المنتج'
+      {
+        timeoutLabel: 'إنشاء المنتج',
+        failureAction: 'فشل إنشاء المنتج',
+        parseError: 'تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.',
+        invalidError: 'استجابة غير صالحة من الخادم بعد إنشاء المنتج.'
+      }
     );
   } catch (err) {
-    // Preserve the creation-specific wording from the original implementation.
-    if (err instanceof ApiError && err.message.startsWith('تم التنفيذ')) {
-      throw new ApiError('تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.', err.status);
-    }
-    if (err instanceof ApiError && err.message.startsWith('استجابة غير صالحة')) {
-      throw new ApiError('استجابة غير صالحة من الخادم بعد إنشاء المنتج.', err.status);
-    }
     throw err;
   }
 }
@@ -397,7 +439,47 @@ export async function updateProduct(
     `${PRODUCTS_ENDPOINT}/${encodeURIComponent(String(idOrSlug))}`,
     'PATCH',
     form,
-    'حفظ المنتج',
-    'فشل تحديث المنتج'
+    {
+      timeoutLabel: 'حفظ المنتج',
+      failureAction: 'فشل تحديث المنتج',
+      parseError: 'تم تحديث المنتج لكن تعذّرت قراءة استجابة الخادم.',
+      invalidError: 'استجابة غير صالحة من الخادم بعد تحديث المنتج.'
+    }
   );
+}
+
+/**
+ * Delete a product by ID or slug via `DELETE /api/products/{idOrSlug}`.
+ * Removes the product row, its image rows, and the stored image files.
+ * Throws {@link ApiError} with a user-facing Arabic message on any failure.
+ */
+export async function deleteProduct(idOrSlug: number | string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${PRODUCTS_ENDPOINT}/${encodeURIComponent(String(idOrSlug))}`, {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق حذف المنتج وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('المنتج غير موجود. ربما تم حذفه بالفعل.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(`فشل حذف المنتج (رمز ${response.status}).`, response.status);
+  }
+
+  // 204 No Content is the expected success response.
 }

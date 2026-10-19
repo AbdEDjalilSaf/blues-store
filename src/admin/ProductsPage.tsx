@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
-import { CheckCircle2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { formatPrice, resolveImageUrl, fallbackImage, type ApiProduct } from '../lib/api';
+import { CheckCircle2, Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { deleteProduct, fetchProduct, formatPrice, resolveImageUrl, fallbackImage, type ApiProduct } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { resetAdminProducts, useAdminProducts } from './productCache';
 import Pagination from './Pagination';
@@ -8,6 +8,7 @@ import { ProductsEmpty, ProductsError, ProductsPageSkeleton } from './ProductsSt
 
 /** The form (and its upload UI) ships in its own chunk, opened on demand. */
 const ProductFormModal = lazy(() => import('./ProductFormModal'));
+const ProductDetailsModal = lazy(() => import('./ProductDetailsModal'));
 
 const PAGE_SIZE = 8;
 
@@ -43,6 +44,7 @@ function ProductsManager({ showToast }: ManagerProps) {
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ApiProduct | null>(null);
+  const [viewing, setViewing] = useState<ApiProduct | null>(null);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -72,14 +74,32 @@ function ProductsManager({ showToast }: ManagerProps) {
     setFormOpen(true);
   }, []);
 
-  const openEdit = useCallback((product: ApiProduct) => {
-    setEditing(product);
-    setFormOpen(true);
-  }, []);
+  const openEdit = useCallback(async (product: ApiProduct) => {
+    try {
+      const fresh = await fetchProduct(product.id);
+      setEditing(fresh);
+      setFormOpen(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'تعذّر تحميل بيانات المنتج');
+    }
+  }, [showToast]);
 
   const closeForm = useCallback(() => {
     setFormOpen(false);
     setEditing(null);
+  }, []);
+
+  const openView = useCallback(async (product: ApiProduct) => {
+    try {
+      const fresh = await fetchProduct(product.id);
+      setViewing(fresh);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'تعذّر تحميل بيانات المنتج');
+    }
+  }, [showToast]);
+
+  const closeView = useCallback(() => {
+    setViewing(null);
   }, []);
 
   const handleCreated = useCallback(
@@ -99,10 +119,15 @@ function ProductsManager({ showToast }: ManagerProps) {
   );
 
   const handleDelete = useCallback(
-    (product: ApiProduct) => {
+    async (product: ApiProduct) => {
       if (!confirm(`هل أنت متأكد من حذف «${product.name}»؟`)) return;
-      setItems((prev) => prev.filter((p) => p.id !== product.id));
-      showToast('تم حذف المنتج بنجاح');
+      try {
+        await deleteProduct(product.id);
+        setItems((prev) => prev.filter((p) => p.id !== product.id));
+        showToast('تم حذف المنتج بنجاح');
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'تعذّر حذف المنتج');
+      }
     },
     [showToast]
   );
@@ -167,7 +192,6 @@ function ProductsManager({ showToast }: ManagerProps) {
               <tbody className="divide-y divide-gray-200">
                 {paged.map((product) => {
                   const image = primaryImage(product);
-                  console.log("==== image ====",image);
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-all">
                       <td className="px-6 py-4">
@@ -211,6 +235,13 @@ function ProductsManager({ showToast }: ManagerProps) {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <button
+                            onClick={() => openView(product)}
+                            className="p-2 hover:bg-blue-50 rounded-lg transition-all"
+                            aria-label={`عرض ${product.name}`}
+                          >
+                            <Eye size={17} className="text-[#1d6fd1]" />
+                          </button>
+                          <button
                             onClick={() => openEdit(product)}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-all"
                             aria-label={`تعديل ${product.name}`}
@@ -251,6 +282,12 @@ function ProductsManager({ showToast }: ManagerProps) {
             onCreated={handleCreated}
             onUpdated={handleUpdated}
           />
+        </Suspense>
+      )}
+
+      {viewing && (
+        <Suspense fallback={null}>
+          <ProductDetailsModal product={viewing} onClose={closeView} />
         </Suspense>
       )}
     </div>

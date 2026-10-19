@@ -20,7 +20,7 @@
  *
  * Usage: node scripts/seo-prerender.mjs
  */
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -235,6 +235,36 @@ let html = await readFile(htmlPath, 'utf8');
 html = html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>\s*/g, '');
 html = html.replace(/<noscript>\s*<section>[\s\S]*?<\/noscript>\s*/g, '');
 
+/* ------------------------------------------------- admin (/admin) artefact */
+
+/**
+ * The SPA rewrite serves the same bundle for /admin, so the build emits a
+ * dedicated admin shell that search engines must never index:
+ *
+ *   - `noindex, nofollow, noarchive` robots meta (plus the X-Robots-Tag
+ *     header from vercel.json, for crawlers that skip meta tags)
+ *   - storefront canonical / Open Graph / Twitter / JSON-LD stripped, so
+ *     the private URL can never compete with the storefront in the SERP
+ *   - no hero-image preload or sitemap link: both are storefront-only
+ */
+const adminHtml = html
+  .replace(/<title>[^<]*<\/title>/, '<title>إدارة بلوز سيتي — لوحة التحكم</title>')
+  .replace(
+    /<meta name="robots"[^>]*>/,
+    '<meta name="robots" content="noindex, nofollow, noarchive" />'
+  )
+  .replace(
+    /<meta name="description"[^>]*>/,
+    '<meta name="description" content="لوحة تحكم متجر بلوز سيتي — للإدارة فقط." />'
+  )
+  .replace(/<meta name="keywords"[^>]*>\s*/g, '')
+  .replace(/<meta name="googlebot"[^>]*>\s*/g, '')
+  .replace(/<link rel="canonical"[^>]*>\s*/g, '')
+  .replace(/<link rel="sitemap"[^>]*>\s*/g, '')
+  .replace(/<link rel="preload"[\s\S]*?\/>\s*/g, '')
+  .replace(/<meta property="og:[^>]*>\s*/g, '')
+  .replace(/<meta name="twitter:[^>]*>\s*/g, '');
+
 const marker = '</head>';
 if (!html.includes(marker)) throw new Error('dist/index.html has no </head>');
 html = html.replace(marker, `  ${jsonLd}\n  ${marker}`);
@@ -242,10 +272,13 @@ html = html.replace(marker, `  ${jsonLd}\n  ${marker}`);
 html = html.replace('</body>', `${noscript}\n  </body>`);
 
 await writeFile(htmlPath, html, 'utf8');
+await mkdir(join(root, 'dist/admin'), { recursive: true });
+await writeFile(join(root, 'dist/admin/index.html'), adminHtml, 'utf8');
 await writeFile(join(root, 'dist/sitemap.xml'), sitemap, 'utf8');
 
 const kb = (s) => `${(Buffer.byteLength(s, 'utf8') / 1024).toFixed(1)} KB`;
 console.log(`seo-prerender: JSON-LD graph (${graph.length} nodes, ${products.length} products) ${kb(jsonLd)}`);
 console.log(`seo-prerender: noscript catalog ${kb(noscript)}`);
 console.log(`seo-prerender: dist/index.html now ${kb(html)}`);
+console.log(`seo-prerender: dist/admin/index.html (noindex) ${kb(adminHtml)}`);
 console.log('seo-prerender: wrote dist/sitemap.xml');

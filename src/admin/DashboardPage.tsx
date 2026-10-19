@@ -1,4 +1,18 @@
-export default function DashboardPage() {
+import { memo, useEffect } from 'react';
+import { prefetchAdminProducts, useAdminProductsSnapshot } from './productCache';
+
+/**
+ * Stats cards read from the shared admin product cache (`productCache.ts`),
+ * so navigating here after Products costs zero extra network requests and
+ * the list is prefetched as soon as the admin shell goes idle.
+ */
+function DashboardPage() {
+  const products = useAdminProductsSnapshot();
+
+  useEffect(() => {
+    prefetchAdminProducts();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -17,7 +31,9 @@ export default function DashboardPage() {
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="text-sm font-bold text-gray-500 mb-2">إجمالي المنتجات</div>
-          <div className="font-black text-2xl text-[#0f2f52]">12</div>
+          <div className="font-black text-2xl text-[#0f2f52]">
+            {products.length > 0 ? products.length : '…'}
+          </div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="text-sm font-bold text-gray-500 mb-2">العملاء</div>
@@ -34,3 +50,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+export default memo(DashboardPage);

@@ -5,4 +5,7 @@ Allow: /
 Disallow: /assets/
 Disallow: /arena-preview.js
 
+# The admin dashboard is private — never index it.
+Disallow: /admin
+
 Sitemap: https://bluescity.store/sitemap.xml

@@ -1,16 +1,333 @@
-export default function OrdersPage() {
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Eye, RefreshCw } from 'lucide-react';
+import { formatPrice } from '../lib/api';
+import ErrorBoundary from '../components/ErrorBoundary';
+import {
+  ORDER_STATUS_BADGE_CLASSES,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  fetchAdminOrders,
+  invalidateAdminOrdersCache,
+  updateAdminOrderStatus,
+  type AdminOrder,
+  type AdminOrdersPage,
+  type OrderStatus,
+} from '../lib/ordersApi';
+import Pagination from './Pagination';
+import { OrdersEmpty, OrdersError, OrdersTableSkeleton } from './OrdersStates';
+
+/** The detail view (and its timeline UI) ships in its own chunk, opened on demand. */
+const OrderDetailsModal = lazy(() => import('./OrderDetailsModal'));
+
+const PAGE_SIZE = 8; // Smaller page size for faster API responses
+
+/** Server-paginated tab bar: `null` = all orders, otherwise the status enum. */
+const STATUS_TABS: { value: OrderStatus | null; label: string }[] = [
+  { value: null, label: 'الكل' },
+  ...ORDER_STATUSES.map((status) => ({ value: status, label: ORDER_STATUS_LABELS[status] })),
+];
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+interface ManagerProps {
+  showToast: (message: string) => void;
+}
+
+/**
+ * Data-bound view. Unlike Products (one fetch + client-side slicing), orders
+ * are paginated and filtered *server-side*, so each tab/page change is a small
+ * request. The module cache in `ordersApi` makes revisited pages instant, and
+ * every superseded request is aborted so a slow response can't clobber the UI.
+ */
+function OrdersManager({ showToast }: ManagerProps) {
+  const [status, setStatus] = useState<OrderStatus | null>(null);
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState<AdminOrdersPage | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [viewing, setViewing] = useState<AdminOrder | null>(null);
+
+  /**
+   * Identity of the query currently displayed. "Refreshing" is *derived*
+   * (displayed query ≠ active query) rather than set inside the load call,
+   * so the effect body never triggers a synchronous state update.
+   */
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const activeKey = `${status ?? 'all'}|${page}|${refreshNonce}`;
+  const isRefreshing = result !== null && loadedKey !== activeKey;
+
+  /** Monotonic sequence — only the latest request may touch state. */
+  const requestSeq = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const load = useCallback(
+    (nextStatus: OrderStatus | null, nextPage: number, nonce: number, force: boolean) => {
+      const seq = ++requestSeq.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const key = `${nextStatus ?? 'all'}|${nextPage}|${nonce}`;
+
+      fetchAdminOrders({
+        status: nextStatus,
+        page: nextPage,
+        perPage: PAGE_SIZE,
+        force,
+        signal: controller.signal,
+      })
+        .then((res) => {
+          if (seq !== requestSeq.current) return;
+          setResult(res);
+          setError(null);
+          setLoadedKey(key);
+          // Rows vanished (e.g. last row of the last page) — snap to a valid page.
+          if (res.meta.currentPage !== nextPage) setPage(res.meta.currentPage);
+        })
+        .catch((err: unknown) => {
+          if (seq !== requestSeq.current) return;
+          // A cancelled request is intentional — never surface it.
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          setError(err);
+          setLoadedKey(key);
+        });
+    },
+    []
+  );
+
+  useEffect(() => {
+    load(status, page, refreshNonce, false);
+    return () => abortRef.current?.abort();
+  }, [load, status, page, refreshNonce]);
+
+  // Prefetch next page when not on the last page
+  useEffect(() => {
+    if (!result || result.meta.lastPage <= page) return;
+    const timer = setTimeout(() => {
+      load(status, page + 1, refreshNonce, false);
+    }, 1000); // Prefetch after 1 second
+    return () => clearTimeout(timer);
+  }, [result, status, page, refreshNonce, load]);
+
+  const selectTab = useCallback((next: OrderStatus | null) => {
+    setStatus(next);
+    setPage(1);
+  }, []);
+
+  /** Retry/refresh: bust the memory cache and bump the nonce to re-run the effect. */
+  const reload = useCallback(() => {
+    invalidateAdminOrdersCache();
+    setRefreshNonce((n) => n + 1);
+  }, []);
+
+  const handleStatusChange = useCallback(
+    async (id: number, next: OrderStatus): Promise<boolean> => {
+      try {
+        const updated = await updateAdminOrderStatus(id, next);
+        showToast('تم تحديث حالة الطلب بنجاح');
+        setViewing((prev) => {
+          if (!prev || prev.id !== id) return prev;
+          // Prefer the server's refreshed order; fall back to a local flip.
+          if (updated) return { ...updated, status: next };
+          return {
+            ...prev,
+            status: next,
+            timeline: [
+              ...prev.timeline,
+              { status: next, changed_at: new Date().toISOString() },
+            ],
+          };
+        });
+        // Cache is already invalidated by the API layer; re-sync the visible page.
+        reload();
+        return true;
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'تعذّر تحديث حالة الطلب');
+        return false;
+      }
+    },
+    [showToast, reload]
+  );
+
+  const meta = result?.meta;
+  const orders = result?.orders ?? [];
+  console.log("============ orders ===================", orders);
+  const rangeStart = meta?.from ?? 0;
+  const rangeEnd = meta?.to ?? 0;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-black text-2xl text-[#0f2f52]">الطلبات</h1>
-        <p className="text-sm font-bold text-gray-500">إدارة طلبات العملاء</p>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <div className="text-sm font-bold text-gray-500 text-center py-8">
-          لا يوجد طلبات بعد
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-black text-2xl text-[#0f2f52]">الطلبات</h1>
+          <p className="text-sm font-bold text-gray-500">
+            {meta && meta.total > 0 ? `${meta.total} طلب من العملاء` : 'إدارة طلبات العملاء'}
+          </p>
         </div>
       </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mb-1" role="tablist" aria-label="تصفية حسب الحالة">
+        {STATUS_TABS.map((tab) => {
+          const active = status === tab.value;
+          return (
+            <button
+              key={tab.value ?? 'all'}
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectTab(tab.value)}
+              className={`whitespace-nowrap font-black text-sm px-4 py-2 rounded-full transition-all ${
+                active
+                  ? 'bg-[#0f2f52] text-white'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        {error !== null && result === null ? (
+          <OrdersError error={error} onRetry={reload} />
+        ) : result === null ? (
+          <OrdersTableSkeleton />
+        ) : orders.length === 0 ? (
+          <OrdersEmpty filtered={status !== null} onClearFilter={() => selectTab(null)} />
+        ) : (
+          <div className={isRefreshing ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['رقم الطلب', 'العميل', 'الولاية', 'المجموع', 'الحالة', 'الإجراءات'].map((h) => (
+                      <th
+                        key={h}
+                        className="px-6 py-3 text-right text-xs font-black text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50 transition-all">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-black text-sm text-[#0f2f52]" dir="ltr">
+                          {order.order_number}
+                        </div>
+                        <div className="text-xs font-bold text-gray-500">
+                          {formatDateTime(order.created_at)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-black text-sm text-[#0f2f52]">
+                          {order.customer_name || '—'}
+                        </div>
+                        {order.phone && (
+                          <a
+                            href={`tel:${order.phone}`}
+                            className="text-xs font-bold text-[#1d6fd1] hover:underline"
+                            dir="ltr"
+                          >
+                            {order.phone}
+                          </a>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
+                        {order.wilaya || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-[#0f2f52]">
+                        {formatPrice(order.total)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
+                            ORDER_STATUS_BADGE_CLASSES[order.status]
+                          }`}
+                        >
+                          {ORDER_STATUS_LABELS[order.status]}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => setViewing(order)}
+                          className="p-2 hover:bg-blue-50 rounded-lg transition-all"
+                          aria-label={`عرض الطلب ${order.order_number}`}
+                        >
+                          <Eye size={17} className="text-[#1d6fd1]" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-200">
+              <p className="text-xs font-bold text-gray-500">
+                عرض {rangeStart}–{rangeEnd} من {meta?.total ?? 0} طلب
+              </p>
+              <Pagination
+                page={meta?.currentPage ?? 1}
+                totalPages={meta?.lastPage ?? 1}
+                onPageChange={setPage}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {viewing && (
+        <Suspense fallback={null}>
+          <OrderDetailsModal
+            order={viewing}
+            onClose={() => setViewing(null)}
+            onStatusChange={handleStatusChange}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+export default function OrdersPage() {
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  return (
+    <div className="space-y-6">
+      {toast && (
+        <div
+          role="status"
+          className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 font-black text-sm px-4 py-3 rounded-xl"
+        >
+          <CheckCircle2 size={18} /> {toast}
+        </div>
+      )}
+
+      <ErrorBoundary
+        onReset={invalidateAdminOrdersCache}
+        fallback={(error, reset) => (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <OrdersError error={error} onRetry={reset} />
+          </div>
+        )}
+      >
+        <OrdersManager showToast={showToast} />
+      </ErrorBoundary>
     </div>
   );
 }

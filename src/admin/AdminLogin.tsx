@@ -15,9 +15,9 @@ export default function AdminLogin({ onLogin }: Props) {
     // Hardcoded credentials
     if (email === 'noodsaf01@gmail.com' && password === 'nood saf 2003') {
       localStorage.setItem('admin-auth', 'true');
+      // Hand control back to AdminApp — no full reload, so the lazily
+      // loaded admin chunks and the warm product cache survive login.
       onLogin();
-      // Redirect to /admin
-      window.location.href = '/admin';
     } else {
       setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
     }
