@@ -106,11 +106,22 @@ function OrdersManager({ showToast }: ManagerProps) {
   // Prefetch next page when not on the last page
   useEffect(() => {
     if (!result || result.meta.lastPage <= page) return;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      load(status, page + 1, refreshNonce, false);
+      fetchAdminOrders({
+        status,
+        page: page + 1,
+        perPage: PAGE_SIZE,
+        signal: controller.signal,
+      }).catch(() => {
+        /* prefetch is best-effort — ignore failures */
+      });
     }, 1000); // Prefetch after 1 second
-    return () => clearTimeout(timer);
-  }, [result, status, page, refreshNonce, load]);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [result, status, page]);
 
   const selectTab = useCallback((next: OrderStatus | null) => {
     setStatus(next);
@@ -154,7 +165,6 @@ function OrdersManager({ showToast }: ManagerProps) {
 
   const meta = result?.meta;
   const orders = result?.orders ?? [];
-  console.log("============ orders ===================", orders);
   const rangeStart = meta?.from ?? 0;
   const rangeEnd = meta?.to ?? 0;
 

@@ -1,18 +1,16 @@
 ﻿import { useState } from 'react';
-import { BadgeCheck, Banknote, CheckCircle2, CreditCard, Loader2, MapPin, Phone, User, Wallet, X } from 'lucide-react';
+import { BadgeCheck, Banknote, CheckCircle2, Loader2, MapPin, Phone, User, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
-import { saveOrder } from '../lib/catalog';
+import { WILAYAS, OrderValidationError, createOrder, type CreatedOrder } from '../lib/checkoutApi';
 import { useCart, useShopActions } from '../store/shop';
-
-const CITIES = ['أدرار', 'الشلف', 'الأغواط', 'أم البواقي', 'باتنة', 'بجاية', 'بسكرة', 'بشار', 'البليدة', 'البويرة', 'تمنراست', 'تبسة', 'تلمسان', 'تيارت', 'تيزي وزو', 'الجزائر', 'الجلفة', 'جيجل', 'سطيف', 'سعيدة', 'سكيكدة', 'سيدي بلعباس', 'عنابة', 'قالمة', 'قسنطينة', 'المدية', 'مستغانم', 'المسيلة', 'معسكر', 'ورقلة', 'وهران', 'البيض', 'إليزي', 'برج بوعريريج', 'بومرداس', 'الطارف', 'تندوف', 'تيسمسيلت', 'الوادي', 'خنشلة', 'سوق أهراس', 'تيبازة', 'ميلة', 'عين الدفلى', 'النعامة', 'عين تموشنت', 'غرداية', 'غليزان', 'تيميمون', 'برج باجي مختار', 'أولاد جلال', 'بني عباس', 'عين صالح', 'عين قزام', 'تقرت', 'جانت', 'المغير', 'المنيعة', 'آفلو', 'بريكة', 'القنطرة', 'بئر العاتر', 'العريشة', 'الأبيض سيدي الشيخ', 'المغير', 'الحجيرة', 'عين وسارة', 'مسعد', 'قصر الشلالة'];
 
 export default function CheckoutModal({ open, onClose }: { open: boolean; onClose: (orderId?: number) => void }) {
   const { cart, subtotal } = useCart();
   const { clearCart, showToast } = useShopActions();
-  const [form, setForm] = useState({ name: '', phone: '', city: 'الجزائر', address: '', notes: '', pay: 'عند الاستلام' });
+  const [form, setForm] = useState({ name: '', phone: '', wilayaId: 16, pay: 'عند الاستلام' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
-  const [doneId, setDoneId] = useState<number | null>(null);
+  const [done, setDone] = useState<CreatedOrder | null>(null);
 
   if (!open) return null;  
   const shipping = subtotal >= 300 || subtotal === 0 ? 0 : 25;
@@ -28,8 +26,7 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
     const e: Record<string, string> = {};
     if (form.name.trim().length < 3) e.name = 'فضلاً أدخل الاسم الكامل';
     if (!/^(0[5-7]\d{8})$/.test(form.phone.replace(/[\s-]/g, ''))) e.phone = 'رقم الجوال يجب أن يبدأ بـ 05 أو 06 أو 07 ويتكون من 10 أرقام';
-    if (!form.city) e.city = 'اختر المدينة';
-    if (form.address.trim().length < 8) e.address = 'فضلاً أدخل العنوان بالتفصيل (الحي + الشارع)';
+    if (!form.wilayaId) e.city = 'اختر الولاية';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -40,33 +37,47 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
     if (cart.length === 0) { showToast('سلتك فارغة'); return; }
     setSending(true);
     try {
-      const items = cart.map((c) => ({ product_id: c.product.id, name: c.product.name_ar, size: c.size, qty: c.qty, price: Number(c.product.price), image: c.product.image }));
-      const order = saveOrder({
+      // The contract's items carry only `product_id` (no qty), so each unit
+      // of a line becomes its own entry — subtotal math stays correct.
+      const items = cart.flatMap((c) =>
+        Array.from({ length: Math.max(1, c.qty) }, () => ({ product_id: c.product.id }))
+      );
+      const order = await createOrder({
         customer_name: form.name.trim(),
         phone: form.phone.replace(/[\s-]/g, ''),
-        city: form.city,
-        address: form.address.trim(),
+        wilaya_id: form.wilayaId,
         items,
-        total: grand,
       });
-      setDoneId(order.id);
+      setDone(order);
       clearCart();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'تعذر إتمام الطلب، حاول لاحقاً');
+      if (err instanceof OrderValidationError) {
+        const mapped: Record<string, string> = {};
+        if (err.fields.customer_name) mapped.name = err.fields.customer_name;
+        if (err.fields.phone) mapped.phone = err.fields.phone;
+        if (err.fields.wilaya_id) mapped.city = err.fields.wilaya_id;
+        if (Object.keys(mapped).length > 0) setErrors(mapped);
+        showToast(err.message);
+      } else {
+        showToast(err instanceof Error ? err.message : 'تعذر إتمام الطلب، حاول لاحقاً');
+      }
     } finally { setSending(false); }
   };
 
-  const closeAll = () => { setDoneId(null); onClose(doneId || undefined); };
+  const closeAll = () => { const id = done?.id; setDone(null); onClose(id || undefined); };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-label="إتمام الطلب">
       <div className="absolute inset-0 bg-[#0f2f52]/75 backdrop-blur-sm" onClick={closeAll} />
       <div className="relative bg-[#f5f9fe] w-full max-w-2xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl">
-        {doneId ? (
+        {done ? (
           <div className="p-8 md:p-10 text-center">
             <CheckCircle2 size={64} className="mx-auto text-[#1d6fd1] mb-4" />
             <h3 className="font-black text-2xl md:text-3xl text-[#0f2f52] mb-2">تم استلام طلبك بنجاح!</h3>
-            <p className="font-bold text-[#0f2f52]/60 mb-4">رقم الطلب: <span className="font-black text-[#1565c0] text-xl">#{doneId}</span></p>
+            {done.order_number || done.id > 0 ? (
+              <p className="font-bold text-[#0f2f52]/60 mb-1">رقم الطلب: <span className="font-black text-[#1565c0] text-xl" dir="ltr">{done.order_number || `#${done.id}`}</span></p>
+            ) : null}
+            <p className="font-bold text-[#0f2f52]/60 mb-4">{done.wilaya ? `الولاية: ${done.wilaya} • ` : ''}الإجمالي: <span className="font-black text-[#1565c0]">{formatPrice(done.total)}</span></p>
             <div className="bg-white border-2 border-dashed border-[#1d6fd1]/30 rounded-2xl p-4 text-sm font-bold text-[#0f2f52]/70 leading-7 mb-6">
               سنتواصل معك قريباً لتأكيد الطلب.<br />احتفظ برقم الطلب لتتبع الشحنة من قسم «تتبع طلبك» برقم جوالك.
             </div>
@@ -93,12 +104,12 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-black text-[13px] text-[#0f2f52] flex items-center gap-1.5 mb-1.5"><MapPin size={15} /> المدينة *</label>
-                  <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full bg-white border-2 border-[#0f2f52]/12 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-[#2f9de4]">
-                    {CITIES.map((c) => <option key={c}>{c}</option>)}
+                  <label className="font-black text-[13px] text-[#0f2f52] flex items-center gap-1.5 mb-1.5"><MapPin size={15} /> الولاية *</label>
+                  <select value={form.wilayaId} onChange={(e) => setForm({ ...form, wilayaId: Number(e.target.value) })} className={`w-full bg-white border-2 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-[#2f9de4] ${errors.city ? 'border-[#1565c0]' : 'border-[#0f2f52]/12'}`}>
+                    {WILAYAS.map((w) => <option key={w.id} value={w.id}>{String(w.id).padStart(2, '0')} — {w.name}</option>)}
                   </select>
+                  {errors.city && <div className="text-[12px] font-black text-[#1565c0] mt-1">{errors.city}</div>}
                 </div>
-                
               </div>
               
               <div>
