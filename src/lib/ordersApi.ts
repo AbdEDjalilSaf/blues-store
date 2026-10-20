@@ -286,13 +286,17 @@ export function fetchAdminOrders(query: AdminOrdersQuery = {}): Promise<AdminOrd
     const hit = pageCache.get(key);
     if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.page);
     const existing = inflight.get(key);
-    if (existing) return existing;
+    // A caller-provided signal belongs to that caller. Do not hand a
+    // second component the same promise when the first caller may abort it
+    // during React effect cleanup (StrictMode/navigation), otherwise both
+    // callers receive AbortError and the page can remain on its skeleton.
+    if (existing && !query.signal) return existing;
   }
 
   const request = requestAdminOrders(status, page, perPage, query.signal).then(
     (result) => {
       pageCache.set(key, { page: result, expiresAt: Date.now() + CACHE_TTL_MS });
-      // Cheap FIFO eviction — LRU bookkeeping isn't worth it for 24 entries.
+      // Cheap FIFO eviction — LRU bookkeeping isn't worth the effort for 24 entries.
       while (pageCache.size > MAX_CACHE_ENTRIES) {
         const oldest = pageCache.keys().next().value;
         if (oldest === undefined) break;
@@ -334,7 +338,7 @@ export async function updateAdminOrderStatus(id: number, status: OrderStatus): P
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new ApiError('استغرق تحديث حالة الطلب وقتاً طويلاً. حاول مرة أخرى.');
+      throw new ApiError('استغرق تحديث حالة الطلبات وقتاً طويلاً. حاول مرة أخرى.');
     }
     throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
   } finally {
