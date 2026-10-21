@@ -8,7 +8,6 @@ import {
   ORDER_STATUSES,
   fetchAdminOrders,
   invalidateAdminOrdersCache,
-  updateAdminOrderStatus,
   type AdminOrder,
   type AdminOrdersPage,
   type OrderStatus,
@@ -134,34 +133,6 @@ function OrdersManager({ showToast }: ManagerProps) {
     setRefreshNonce((n) => n + 1);
   }, []);
 
-  const handleStatusChange = useCallback(
-    async (id: number, next: OrderStatus): Promise<boolean> => {
-      try {
-        const updated = await updateAdminOrderStatus(id, next);
-        showToast('تم تحديث حالة الطلب بنجاح');
-        setViewing((prev) => {
-          if (!prev || prev.id !== id) return prev;
-          // Prefer the server's refreshed order; fall back to a local flip.
-          if (updated) return { ...updated, status: next };
-          return {
-            ...prev,
-            status: next,
-            timeline: [
-              ...prev.timeline,
-              { status: next, changed_at: new Date().toISOString() },
-            ],
-          };
-        });
-        // Cache is already invalidated by the API layer; re-sync the visible page.
-        reload();
-        return true;
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'تعذّر تحديث حالة الطلب');
-        return false;
-      }
-    },
-    [showToast, reload]
-  );
 
   const meta = result?.meta;
   const orders = result?.orders ?? [];
@@ -297,7 +268,6 @@ function OrdersManager({ showToast }: ManagerProps) {
           <OrderDetailsModal
             order={viewing}
             onClose={() => setViewing(null)}
-            onStatusChange={handleStatusChange}
           />
         </Suspense>
       )}

@@ -66,7 +66,7 @@ function useAdminPageMeta(page: string): void {
 
 export default function AdminApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(
-    () => localStorage.getItem('admin-auth') === 'true'
+    () => localStorage.getItem('admin-auths') === 'true'
   );
   const [currentPage, setCurrentPage] = useState('dashboard');
 
@@ -83,7 +83,7 @@ export default function AdminApp() {
   const handleLogin = useCallback(() => setIsAuthenticated(true), []);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('admin-auth');
+    localStorage.removeItem('admin-auths');
     setIsAuthenticated(false);
   }, []);
 

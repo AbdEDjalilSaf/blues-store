@@ -14,7 +14,7 @@ export default function AdminLogin({ onLogin }: Props) {
     e.preventDefault();
     // Hardcoded credentials
     if (email === 'noodsaf01@gmail.com' && password === 'nood saf 2003') {
-      localStorage.setItem('admin-auth', 'true');
+      localStorage.setItem('admin-auths', 'true');
       // Hand control back to AdminApp — no full reload, so the lazily
       // loaded admin chunks and the warm product cache survive login.
       onLogin();

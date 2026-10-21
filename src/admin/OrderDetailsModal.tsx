@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Loader2, MapPin, Phone, Save, X } from 'lucide-react';
+import { MapPin, Phone, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import {
   ORDER_STATUS_BADGE_CLASSES,
@@ -12,11 +11,6 @@ import {
 interface Props {
   order: AdminOrder;
   onClose: () => void;
-  /**
-   * Persist a new status. Resolves `true` on success — the page refreshes the
-   * list behind the modal, while this modal flips to the new status instantly.
-   */
-  onStatusChange: (id: number, status: OrderStatus) => Promise<boolean>;
 }
 
 function formatDateTime(value: string): string {
@@ -25,22 +19,7 @@ function formatDateTime(value: string): string {
   return date.toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export default function OrderDetailsModal({ order, onClose, onStatusChange }: Props) {
-  const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status);
-  const [saving, setSaving] = useState(false);
-
-  const hasChanges = nextStatus !== order.status;
-
-  const handleSave = async () => {
-    if (!hasChanges || saving) return;
-    setSaving(true);
-    try {
-      const ok = await onStatusChange(order.id, nextStatus);
-      if (ok) onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
+export default function OrderDetailsModal({ order, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -173,38 +152,6 @@ export default function OrderDetailsModal({ order, onClose, onStatusChange }: Pr
                 ))}
               </ol>
             )}
-          </div>
-
-          <div className="bg-gray-50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            <label htmlFor="order-status" className="font-black text-sm text-[#0f2f52]">
-              تغيير الحالة
-            </label>
-            <select
-              id="order-status"
-              value={nextStatus}
-              onChange={(e) => setNextStatus(e.target.value as OrderStatus)}
-              disabled={saving}
-              className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#2f9de4]"
-            >
-              {ORDER_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {ORDER_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!hasChanges || saving}
-              className={`inline-flex items-center justify-center gap-2 font-black px-4 py-2.5 rounded-xl transition-all ${
-                !hasChanges || saving
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-[#0f2f52] hover:bg-[#1565c0] text-white active:scale-95'
-              }`}
-            >
-              {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-              {saving ? 'جارٍ الحفظ…' : 'حفظ الحالة'}
-            </button>
           </div>
         </div>
       </div>
