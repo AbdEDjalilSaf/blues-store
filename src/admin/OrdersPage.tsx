@@ -1,13 +1,15 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Eye, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Eye, RefreshCw, Trash2,CircleX  } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import {
   ORDER_STATUS_BADGE_CLASSES,
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
+  deleteAdminOrder,
   fetchAdminOrders,
   invalidateAdminOrdersCache,
+  updateAdminOrderStatus,
   type AdminOrder,
   type AdminOrdersPage,
   type OrderStatus,
@@ -48,6 +50,10 @@ function OrdersManager({ showToast }: ManagerProps) {
   const [result, setResult] = useState<AdminOrdersPage | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [viewing, setViewing] = useState<AdminOrder | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [changingStatusId, setChangingStatusId] = useState<number | null>(null);
 
   /**
    * Identity of the query currently displayed. "Refreshing" is *derived*
@@ -132,6 +138,101 @@ function OrdersManager({ showToast }: ManagerProps) {
     invalidateAdminOrdersCache();
     setRefreshNonce((n) => n + 1);
   }, []);
+
+  const cancelOrder = useCallback(
+    async (order: AdminOrder) => {
+      if (order.status === 'cancelled') return;
+      if (!confirm(`هل أنت متأكد من إلغاء الطلب ${order.order_number}؟`)) return;
+
+      setCancellingId(order.id);
+      try {
+        await updateAdminOrderStatus(order.id, 'cancelled');
+        showToast('تم إلغاء الطلب بنجاح');
+        invalidateAdminOrdersCache();
+        setRefreshNonce((n) => n + 1);
+        if (viewing?.id === order.id) {
+          setViewing((current) => (current ? { ...current, status: 'cancelled' } : current));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذّر إلغاء الطلب. حاول مرة أخرى.';
+        showToast(message);
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [showToast, viewing]
+  );
+
+  const deleteOrder = useCallback(
+    async (order: AdminOrder) => {
+      if (!confirm(`هل أنت متأكد من حذف الطلب ${order.order_number} نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+
+      setDeletingId(order.id);
+      try {
+        await deleteAdminOrder(order.id);
+        showToast('تم حذف الطلب بنجاح');
+        invalidateAdminOrdersCache();
+        setRefreshNonce((n) => n + 1);
+        if (viewing?.id === order.id) {
+          setViewing(null);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذّر حذف الطلب. حاول مرة أخرى.';
+        showToast(message);
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [showToast, viewing]
+  );
+
+  const confirmOrder = useCallback(
+    async (order: AdminOrder) => {
+      if (order.status !== 'pending') return;
+      if (!confirm(`هل أنت متأكد من تأكيد الطلب ${order.order_number}؟`)) return;
+
+      setConfirmingId(order.id);
+      try {
+        await updateAdminOrderStatus(order.id, 'confirmed');
+        showToast('تم تأكيد الطلب بنجاح');
+        invalidateAdminOrdersCache();
+        setRefreshNonce((n) => n + 1);
+        if (viewing?.id === order.id) {
+          setViewing((current) => (current ? { ...current, status: 'confirmed' } : current));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذّر تأكيد الطلب. حاول مرة أخرى.';
+        showToast(message);
+      } finally {
+        setConfirmingId(null);
+      }
+    },
+    [showToast, viewing]
+  );
+
+  const handleStatusChange = useCallback(
+    async (order: AdminOrder, newStatus: OrderStatus) => {
+      if (order.status === newStatus) return;
+      if (!confirm(`هل أنت متأكد من تغيير حالة الطلب ${order.order_number} إلى "${ORDER_STATUS_LABELS[newStatus]}"؟`)) return;
+
+      setChangingStatusId(order.id);
+      try {
+        await updateAdminOrderStatus(order.id, newStatus);
+        showToast(`تم تغيير حالة الطلب إلى "${ORDER_STATUS_LABELS[newStatus]}"`);
+        invalidateAdminOrdersCache();
+        setRefreshNonce((n) => n + 1);
+        if (viewing?.id === order.id) {
+          setViewing((current) => (current ? { ...current, status: newStatus } : current));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذّر تغيير حالة الطلب. حاول مرة أخرى.';
+        showToast(message);
+      } finally {
+        setChangingStatusId(null);
+      }
+    },
+    [showToast, viewing]
+  );
 
 
   const meta = result?.meta;
@@ -235,13 +336,35 @@ function OrdersManager({ showToast }: ManagerProps) {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => setViewing(order)}
-                          className="p-2 hover:bg-blue-50 rounded-lg transition-all"
-                          aria-label={`عرض الطلب ${order.order_number}`}
-                        >
-                          <Eye size={17} className="text-[#1d6fd1]" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setViewing(order)}
+                            className="p-2 hover:bg-blue-50 rounded-lg transition-all"
+                            aria-label={`عرض الطلب ${order.order_number}`}
+                          >
+                            <Eye size={17} className="text-[#1d6fd1]" />
+                          </button>
+                          {order.status !== 'cancelled' && (
+                            <button
+                              onClick={() => cancelOrder(order)}
+                              disabled={cancellingId === order.id}
+                              className="p-2 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label={`إلغاء الطلب ${order.order_number}`}
+                              title="الغاء الطلب"
+                            >
+                              <CircleX size={17} className="text-red-600" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteOrder(order)}
+                            disabled={deletingId === order.id}
+                            className="p-2 hover:bg-red-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label={`حذف الطلب ${order.order_number}`}
+                            title="حذف نهائي"
+                          >
+                            <Trash2 size={17} className="text-red-700" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -268,6 +391,12 @@ function OrdersManager({ showToast }: ManagerProps) {
           <OrderDetailsModal
             order={viewing}
             onClose={() => setViewing(null)}
+            onCancel={cancelOrder}
+            cancelling={cancellingId === viewing.id}
+            onConfirm={confirmOrder}
+            confirming={confirmingId === viewing.id}
+            onStatusChange={handleStatusChange}
+            changingStatus={changingStatusId === viewing.id}
           />
         </Suspense>
       )}

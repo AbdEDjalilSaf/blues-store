@@ -39,7 +39,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 export const ORDER_STATUS_BADGE_CLASSES: Record<OrderStatus, string> = {
   pending: 'bg-amber-100 text-amber-700',
-  confirmed: 'bg-blue-100 text-blue-700',
+  confirmed: 'bg-green-100 text-green-700',
   shipped: 'bg-indigo-100 text-indigo-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
@@ -286,13 +286,17 @@ export function fetchAdminOrders(query: AdminOrdersQuery = {}): Promise<AdminOrd
     const hit = pageCache.get(key);
     if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.page);
     const existing = inflight.get(key);
-    if (existing) return existing;
+    // A caller-provided signal belongs to that caller. Do not hand a
+    // second component the same promise when the first caller may abort it
+    // during React effect cleanup (StrictMode/navigation), otherwise both
+    // callers receive AbortError and the page can remain on its skeleton.
+    if (existing && !query.signal) return existing;
   }
 
   const request = requestAdminOrders(status, page, perPage, query.signal).then(
     (result) => {
       pageCache.set(key, { page: result, expiresAt: Date.now() + CACHE_TTL_MS });
-      // Cheap FIFO eviction — LRU bookkeeping isn't worth it for 24 entries.
+      // Cheap FIFO eviction — LRU bookkeeping isn't worth the effort for 24 entries.
       while (pageCache.size > MAX_CACHE_ENTRIES) {
         const oldest = pageCache.keys().next().value;
         if (oldest === undefined) break;
@@ -334,7 +338,7 @@ export async function updateAdminOrderStatus(id: number, status: OrderStatus): P
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new ApiError('استغرق تحديث حالة الطلب وقتاً طويلاً. حاول مرة أخرى.');
+      throw new ApiError('استغرق تحديث حالة الطلبات وقتاً طويلاً. حاول مرة أخرى.');
     }
     throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
   } finally {
@@ -358,4 +362,44 @@ export async function updateAdminOrderStatus(id: number, status: OrderStatus): P
     // 204/empty body is fine — the caller refetches anyway.
     return null;
   }
+}
+
+/**
+ * Delete an order via `DELETE /api/admin/orders/{id}`.
+ * Returns `true` on success (204). Throws `ApiError` with Arabic messages
+ * for 404 (order not found) and 422 (cannot delete shipped/delivered orders).
+ * Invalidates the page cache on success so no page shows a stale order.
+ */
+export async function deleteAdminOrder(id: number): Promise<void> {
+  const { signal, dispose } = createRequestSignal();
+
+  let response: Response;
+  try {
+    response = await fetch(`${ORDERS_ENDPOINT}/${encodeURIComponent(String(id))}`, {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق حذف الطلب وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    dispose();
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('الطلب غير موجود. ربما تم حذفه بالفعل.', response.status);
+  }
+
+  if (response.status === 422) {
+    throw new ApiError('لا يمكن حذف الطلبات التي تم شحنها أو توصيلها.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response, 'فشل حذف الطلب'), response.status);
+  }
+
+  invalidateAdminOrdersCache();
 }

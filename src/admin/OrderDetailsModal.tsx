@@ -1,4 +1,5 @@
-import { MapPin, Phone, X } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ChevronDown, Loader2, MapPin, Phone, Trash2, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import {
   ORDER_STATUS_BADGE_CLASSES,
@@ -11,6 +12,12 @@ import {
 interface Props {
   order: AdminOrder;
   onClose: () => void;
+  onCancel?: (order: AdminOrder) => void | Promise<void>;
+  cancelling?: boolean;
+  onConfirm?: (order: AdminOrder) => void | Promise<void>;
+  confirming?: boolean;
+  onStatusChange?: (order: AdminOrder, newStatus: OrderStatus) => void | Promise<void>;
+  changingStatus?: boolean;
 }
 
 function formatDateTime(value: string): string {
@@ -19,7 +26,8 @@ function formatDateTime(value: string): string {
   return date.toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export default function OrderDetailsModal({ order, onClose }: Props) {
+export default function OrderDetailsModal({ order, onClose, onCancel, cancelling = false, onConfirm, confirming = false, onStatusChange, changingStatus = false }: Props) {
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -69,13 +77,41 @@ export default function OrderDetailsModal({ order, onClose }: Props) {
 
             <div className="bg-gray-50 rounded-xl p-4 space-y-2">
               <div className="text-xs font-bold text-gray-500">الحالة</div>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
-                  ORDER_STATUS_BADGE_CLASSES[order.status]
-                }`}
-              >
-                {ORDER_STATUS_LABELS[order.status]}
-              </span>
+              <div className="relative">
+                <button
+                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  disabled={changingStatus || !onStatusChange}
+                  className={`inline-flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg text-xs font-black w-full transition-all ${
+                    ORDER_STATUS_BADGE_CLASSES[order.status]
+                  } ${onStatusChange ? 'cursor-pointer hover:opacity-90' : 'cursor-default'}`}
+                >
+                  <span>{ORDER_STATUS_LABELS[order.status]}</span>
+                  {onStatusChange && (
+                    <ChevronDown size={14} className={showStatusDropdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                  )}
+                </button>
+                {showStatusDropdown && onStatusChange && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden">
+                    {ORDER_STATUSES.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setShowStatusDropdown(false);
+                          onStatusChange(order, status);
+                        }}
+                        disabled={status === order.status || changingStatus}
+                        className={`w-full text-right px-3 py-2 text-xs font-black transition-all ${
+                          status === order.status
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        {ORDER_STATUS_LABELS[status]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="text-xs font-bold text-gray-400 pt-1">
                 عدد المنتجات: {order.items.length}
               </div>
@@ -153,6 +189,31 @@ export default function OrderDetailsModal({ order, onClose }: Props) {
               </ol>
             )}
           </div>
+
+          {order.status !== 'cancelled' && (
+            <div className="pt-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+              {order.status === 'pending' && onConfirm && (
+                <button
+                  onClick={() => onConfirm(order)}
+                  disabled={confirming}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-black px-5 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {confirming ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                  تأكيد الطلب
+                </button>
+              )}
+              {onCancel && (
+                <button
+                  onClick={() => onCancel(order)}
+                  disabled={cancelling}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 font-black px-5 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cancelling ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                  إلغاء الطلب
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
