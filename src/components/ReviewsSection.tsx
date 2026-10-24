@@ -11,7 +11,6 @@ export default function ReviewsSection() {
     <section id="reviews" className="bg-[#f5f9fe] py-12 md:py-20 scroll-mt-20" aria-labelledby="reviews-heading">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         <div className="text-center mb-8">
-          <div className="inline-block bg-[#2f9de4]/15 border border-[#2f9de4]/40 text-[#0f4c9c] font-black text-[12px] px-4 py-1.5 rounded-full mb-3">قالوا عنا 4.9 من 2,300+ تقييم</div>
           <h2 id="reviews-heading" className="font-black text-3xl md:text-4xl text-[#0f2f52]">مقتنون يوثّقون تجربتهم</h2>
         </div>
         {reviews.length === 0 ? (

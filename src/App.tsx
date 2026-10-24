@@ -26,6 +26,7 @@ const Catalog = lazy(() => import('./components/Catalog'));
 const ProductModal = lazy(() => import('./components/ProductModal'));
 const CartDrawer = lazy(() => import('./components/CartDrawer'));
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
+const OrderTracker = lazy(() => import('./components/OrderTracker'));
 const Story = lazy(() => import('./components/Story'));
 const Auth = lazy(() => import('./components/Auth'));
 const ReviewsSection = lazy(() => import('./components/ReviewsSection'));
@@ -74,6 +75,12 @@ function Site() {
             <Catalog search={search} onView={openProduct} />
           </Suspense>
         </ErrorBoundary>
+
+        <LazySection minHeight={500}>
+          <Suspense fallback={<div style={{ minHeight: 500 }} />}>
+            <OrderTracker />
+          </Suspense>
+        </LazySection>
 
         <LazySection minHeight={900}>
           <Suspense fallback={<div style={{ minHeight: 900 }} />}>

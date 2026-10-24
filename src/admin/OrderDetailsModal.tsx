@@ -92,7 +92,7 @@ export default function OrderDetailsModal({ order, onClose, onCancel, cancelling
                 </button>
                 {showStatusDropdown && onStatusChange && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden">
-                    {ORDER_STATUSES.map((status) => (
+                    {ORDER_STATUSES.filter((status) => status !== 'cancelled').map((status) => (
                       <button
                         key={status}
                         onClick={() => {

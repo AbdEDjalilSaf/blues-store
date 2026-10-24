@@ -6,6 +6,7 @@ import Logo from './Logo';
 const LINKS = [
   { label: 'الرئيسية', href: '#home' },
   { label: 'المتجر', href: '#shop' },
+  { label: 'تتبع الطلب', href: '#track' },
   { label: 'قصتنا', href: '#story' },
   { label: 'آراء العملاء', href: '#reviews' },
 ];
