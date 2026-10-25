@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, Loader2, MapPin, Phone, Truck, Trash2, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, MapPin, Phone, PackageCheck, Truck, Trash2, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import {
   ORDER_STATUS_BADGE_CLASSES,
@@ -18,6 +18,8 @@ interface Props {
   confirming?: boolean;
   onShip?: (order: AdminOrder) => void | Promise<void>;
   shipping?: boolean;
+  onDeliver?: (order: AdminOrder) => void | Promise<void>;
+  delivering?: boolean;
   onStatusChange?: (order: AdminOrder, newStatus: OrderStatus) => void | Promise<void>;
   changingStatus?: boolean;
 }
@@ -28,7 +30,7 @@ function formatDateTime(value: string): string {
   return date.toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export default function OrderDetailsModal({ order, onClose, onCancel, cancelling = false, onConfirm, confirming = false, onShip, shipping = false, onStatusChange, changingStatus = false }: Props) {
+export default function OrderDetailsModal({ order, onClose, onCancel, cancelling = false, onConfirm, confirming = false, onShip, shipping = false, onDeliver, delivering = false, onStatusChange, changingStatus = false }: Props) {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   return (
@@ -212,6 +214,16 @@ export default function OrderDetailsModal({ order, onClose, onCancel, cancelling
                 >
                   {shipping ? <Loader2 size={18} className="animate-spin" /> : <Truck size={18} />}
                   شحن الطلب
+                </button>
+              )}
+              {order.status === 'shipped' && onDeliver && (
+                <button
+                  onClick={() => onDeliver(order)}
+                  disabled={delivering}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 font-black px-5 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {delivering ? <Loader2 size={18} className="animate-spin" /> : <PackageCheck size={18} />}
+                  توصيل الطلب
                 </button>
               )}
               {onCancel && (

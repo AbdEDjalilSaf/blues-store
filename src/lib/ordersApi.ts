@@ -255,17 +255,34 @@ async function requestAdminOrders(
     throw new ApiError(await readErrorMessage(response, 'فشل تحميل الطلبات'), response.status);
   }
 
-  let body: { data?: unknown; meta?: unknown };
+  let body: unknown;
   try {
-    body = (await response.json()) as { data?: unknown; meta?: unknown };
+    body = await response.json();
   } catch {
     throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
   }
 
-  const rows = Array.isArray(body.data) ? body.data : [];
+  // Support both paginated response { data: [], meta: {} } and non-paginated response []
+  let rows: unknown[];
+  let meta: unknown;
+
+  if (Array.isArray(body)) {
+    // Non-paginated response: direct array
+    rows = body;
+    meta = null;
+  } else if (body && typeof body === 'object' && 'data' in body) {
+    // Paginated response: { data: [], meta: {} }
+    const data = (body as { data: unknown }).data;
+    rows = Array.isArray(data) ? data : [];
+    meta = (body as { meta?: unknown }).meta;
+  } else {
+    rows = [];
+    meta = null;
+  }
+
   return {
     orders: rows.map(parseOrder).filter((x): x is AdminOrder => x !== null),
-    meta: parseMeta(body.meta, page, perPage),
+    meta: parseMeta(meta, page, perPage),
   };
 }
 
@@ -400,6 +417,55 @@ export async function shipAdminOrder(id: number): Promise<AdminOrder> {
 
   if (!response.ok) {
     throw new ApiError(await readErrorMessage(response, 'فشل شحن الطلب'), response.status);
+  }
+
+  try {
+    const body = await response.json();
+    const order = parseOrder(body);
+    if (!order) throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+    invalidateAdminOrdersCache();
+    return order;
+  } catch {
+    throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+  }
+}
+
+/**
+ * Deliver an order via `POST /api/admin/orders/{id}/deliver`.
+ * Changes the order status from "shipped" to "delivered".
+ * Returns the updated order. Throws `ApiError` with Arabic messages
+ * for 404 (order not found) and 422 (only shipped orders can be delivered).
+ * Invalidates the page cache on success so no page shows a stale order.
+ */
+export async function deliverAdminOrder(id: number): Promise<AdminOrder> {
+  const { signal, dispose } = createRequestSignal();
+
+  let response: Response;
+  try {
+    response = await fetch(`${ORDERS_ENDPOINT}/${encodeURIComponent(String(id))}/deliver`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق توصيل الطلب وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    dispose();
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('الطلب غير موجود. ربما تم حذفه بالفعل.', response.status);
+  }
+
+  if (response.status === 422) {
+    throw new ApiError('يمكن توصيل الطلبات المشحونة فقط.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response, 'فشل توصيل الطلب'), response.status);
   }
 
   try {
