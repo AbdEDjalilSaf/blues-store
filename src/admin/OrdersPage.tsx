@@ -9,6 +9,7 @@ import {
   deleteAdminOrder,
   fetchAdminOrders,
   invalidateAdminOrdersCache,
+  shipAdminOrder,
   updateAdminOrderStatus,
   type AdminOrder,
   type AdminOrdersPage,
@@ -53,6 +54,7 @@ function OrdersManager({ showToast }: ManagerProps) {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [shippingId, setShippingId] = useState<number | null>(null);
   const [changingStatusId, setChangingStatusId] = useState<number | null>(null);
 
   /**
@@ -234,6 +236,30 @@ function OrdersManager({ showToast }: ManagerProps) {
     [showToast, viewing]
   );
 
+  const shipOrder = useCallback(
+    async (order: AdminOrder) => {
+      if (order.status !== 'confirmed') return;
+      if (!confirm(`هل أنت متأكد من شحن الطلب ${order.order_number}؟`)) return;
+
+      setShippingId(order.id);
+      try {
+        await shipAdminOrder(order.id);
+        showToast('تم شحن الطلب بنجاح');
+        invalidateAdminOrdersCache();
+        setRefreshNonce((n) => n + 1);
+        if (viewing?.id === order.id) {
+          setViewing((current) => (current ? { ...current, status: 'shipped' } : current));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذّر شحن الطلب. حاول مرة أخرى.';
+        showToast(message);
+      } finally {
+        setShippingId(null);
+      }
+    },
+    [showToast, viewing]
+  );
+
 
   const meta = result?.meta;
   const orders = result?.orders ?? [];
@@ -395,6 +421,8 @@ function OrdersManager({ showToast }: ManagerProps) {
             cancelling={cancellingId === viewing.id}
             onConfirm={confirmOrder}
             confirming={confirmingId === viewing.id}
+            onShip={shipOrder}
+            shipping={shippingId === viewing.id}
             onStatusChange={handleStatusChange}
             changingStatus={changingStatusId === viewing.id}
           />

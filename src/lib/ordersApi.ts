@@ -365,6 +365,55 @@ export async function updateAdminOrderStatus(id: number, status: OrderStatus): P
 }
 
 /**
+ * Ship an order via `POST /api/admin/orders/{id}/ship`.
+ * Changes the order status from "confirmed" to "shipped".
+ * Returns the updated order. Throws `ApiError` with Arabic messages
+ * for 404 (order not found) and 422 (only confirmed orders can be shipped).
+ * Invalidates the page cache on success so no page shows a stale order.
+ */
+export async function shipAdminOrder(id: number): Promise<AdminOrder> {
+  const { signal, dispose } = createRequestSignal();
+
+  let response: Response;
+  try {
+    response = await fetch(`${ORDERS_ENDPOINT}/${encodeURIComponent(String(id))}/ship`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('استغرق شحن الطلب وقتاً طويلاً. حاول مرة أخرى.');
+    }
+    throw new ApiError('تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مجدداً.');
+  } finally {
+    dispose();
+  }
+
+  if (response.status === 404) {
+    throw new ApiError('الطلب غير موجود. ربما تم حذفه بالفعل.', response.status);
+  }
+
+  if (response.status === 422) {
+    throw new ApiError('يمكن شحن الطلبات المؤكدة فقط.', response.status);
+  }
+
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response, 'فشل شحن الطلب'), response.status);
+  }
+
+  try {
+    const body = await response.json();
+    const order = parseOrder(body);
+    if (!order) throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+    invalidateAdminOrdersCache();
+    return order;
+  } catch {
+    throw new ApiError('استجابة غير صالحة من الخادم.', response.status);
+  }
+}
+
+/**
  * Delete an order via `DELETE /api/admin/orders/{id}`.
  * Returns `true` on success (204). Throws `ApiError` with Arabic messages
  * for 404 (order not found) and 422 (cannot delete shipped/delivered orders).

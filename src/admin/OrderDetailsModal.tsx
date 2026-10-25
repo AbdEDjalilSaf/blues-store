@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, Loader2, MapPin, Phone, Trash2, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, MapPin, Phone, Truck, Trash2, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import {
   ORDER_STATUS_BADGE_CLASSES,
@@ -16,6 +16,8 @@ interface Props {
   cancelling?: boolean;
   onConfirm?: (order: AdminOrder) => void | Promise<void>;
   confirming?: boolean;
+  onShip?: (order: AdminOrder) => void | Promise<void>;
+  shipping?: boolean;
   onStatusChange?: (order: AdminOrder, newStatus: OrderStatus) => void | Promise<void>;
   changingStatus?: boolean;
 }
@@ -26,7 +28,7 @@ function formatDateTime(value: string): string {
   return date.toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export default function OrderDetailsModal({ order, onClose, onCancel, cancelling = false, onConfirm, confirming = false, onStatusChange, changingStatus = false }: Props) {
+export default function OrderDetailsModal({ order, onClose, onCancel, cancelling = false, onConfirm, confirming = false, onShip, shipping = false, onStatusChange, changingStatus = false }: Props) {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   return (
@@ -200,6 +202,16 @@ export default function OrderDetailsModal({ order, onClose, onCancel, cancelling
                 >
                   {confirming ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                   تأكيد الطلب
+                </button>
+              )}
+              {order.status === 'confirmed' && onShip && (
+                <button
+                  onClick={() => onShip(order)}
+                  disabled={shipping}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black px-5 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {shipping ? <Loader2 size={18} className="animate-spin" /> : <Truck size={18} />}
+                  شحن الطلب
                 </button>
               )}
               {onCancel && (
