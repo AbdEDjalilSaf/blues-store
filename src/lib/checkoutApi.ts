@@ -17,7 +17,7 @@ import { API_BASE_URL, ApiError } from './api';
 
 export const CREATE_ORDER_ENDPOINT = `${API_BASE_URL}/api/orders`;
 
-/** The 58 official Algerian wilayas — `id` is the backend's `wilaya_id`. */
+/** The 69 official Algerian wilayas — `id` is the backend's `wilaya_id`. */
 export interface Wilaya {
   id: number;
   name: string;
@@ -82,6 +82,17 @@ export const WILAYAS: readonly Wilaya[] = [
   { id: 56, name: 'جانت' },
   { id: 57, name: 'المغير' },
   { id: 58, name: 'المنيعة' },
+  { id: 59, name: 'آفلو' },
+  { id: 60, name: 'بريكة' },
+  { id: 61, name: 'قصر الشلالة' },
+  { id: 62, name: 'مسعد' },
+  { id: 63, name: 'عين وسارة' },
+  { id: 64, name: 'بوسعادة' },
+  { id: 65, name: 'الأبيض سيدي الشيخ' },
+  { id: 66, name: 'القنطرة' },
+  { id: 67, name: 'بئر العاتر' },
+  { id: 68, name: 'قصر البخاري' },
+  { id: 69, name: 'العريشة' },
 ];
 
 export interface CreateOrderItemInput {

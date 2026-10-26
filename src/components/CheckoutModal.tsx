@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { BadgeCheck, Banknote, CheckCircle2, Loader2, MapPin, Phone, User, X } from 'lucide-react';
+import { BadgeCheck, Banknote, CheckCircle2, Copy, Loader2, MapPin, Phone, User, X } from 'lucide-react';
 import { formatPrice } from '../lib/api';
 import { WILAYAS, OrderValidationError, createOrder, type CreatedOrder } from '../lib/checkoutApi';
 import { useCart, useShopActions } from '../store/shop';
@@ -12,9 +12,10 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState<CreatedOrder | null>(null);
 
-  if (!open) return null;  
-  const shipping = subtotal >= 300 || subtotal === 0 ? 0 : 25;
+  if (!open) return null;
+  const shipping = subtotal >= 10000 || subtotal === 0 ? 0 : 25;
   const total = subtotal + shipping;
+  const showShipping = subtotal >= 10000;
   let discount = 0;
   try {
     const code = localStorage.getItem('zaman-code');
@@ -66,6 +67,15 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
 
   const closeAll = () => { const id = done?.id; setDone(null); onClose(id || undefined); };
 
+  const copyOrderNumber = () => {
+    const orderNumber = done?.order_number || `#${done?.id}`;
+    navigator.clipboard.writeText(orderNumber).then(() => {
+      showToast('تم نسخ رقم الطلب');
+    }).catch(() => {
+      showToast('فشل نسخ رقم الطلب');
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-label="إتمام الطلب">
       <div className="absolute inset-0 bg-[#0f2f52]/75 backdrop-blur-sm" onClick={closeAll} />
@@ -75,7 +85,13 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
             <CheckCircle2 size={64} className="mx-auto text-[#1d6fd1] mb-4" />
             <h3 className="font-black text-2xl md:text-3xl text-[#0f2f52] mb-2">تم استلام طلبك بنجاح!</h3>
             {done.order_number || done.id > 0 ? (
-              <p className="font-bold text-[#0f2f52]/60 mb-1">رقم الطلب: <span className="font-black text-[#1565c0] text-xl" dir="ltr">{done.order_number || `#${done.id}`}</span></p>
+              <p className="font-bold text-[#0f2f52]/60 mb-1 flex items-center justify-center gap-2">
+                رقم الطلب:
+                <span className="font-black text-[#1565c0] text-xl" dir="ltr">{done.order_number || `#${done.id}`}</span>
+                <button onClick={copyOrderNumber} className="p-1.5 rounded-full hover:bg-[#0f2f52]/10 transition-colors" aria-label="نسخ رقم الطلب">
+                  <Copy size={18} className="text-[#1565c0]" />
+                </button>
+              </p>
             ) : null}
             <p className="font-bold text-[#0f2f52]/60 mb-4">{done.wilaya ? `الولاية: ${done.wilaya} • ` : ''}الإجمالي: <span className="font-black text-[#1565c0]">{formatPrice(done.total)}</span></p>
             <div className="bg-white border-2 border-dashed border-[#1d6fd1]/30 rounded-2xl p-4 text-sm font-bold text-[#0f2f52]/70 leading-7 mb-6">
@@ -127,7 +143,9 @@ export default function CheckoutModal({ open, onClose }: { open: boolean; onClos
                     <div key={`${c.product.id}-${c.size}`} className="flex justify-between text-[13px] font-bold text-[#0f2f52]/70"><span className="truncate">{c.product.name_ar} • {c.size} × {c.qty}</span><span className="shrink-0">{formatPrice(Number(c.product.price) * c.qty)}</span></div>
                   ))}
                 </div>
-                <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/60"><span>الشحن</span><span>{shipping === 0 ? 'مجاني' : formatPrice(shipping)}</span></div>
+                {showShipping && (
+                  <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/60"><span>الشحن</span><span>{shipping === 0 ? 'مجاني' : formatPrice(shipping)}</span></div>
+                )}
                 <div className="flex justify-between font-black text-lg text-[#0f2f52] border-t border-dashed border-[#0f2f52]/15 pt-2"><span>الإجمالي</span><span>{formatPrice(Number(cart.reduce((sum, c) => sum + Number(c.product.price) * c.qty, 0)) + shipping)}</span></div>
               </div>
               <button disabled={sending} className="bg-[#1565c0] hover:bg-[#0d47a1] disabled:opacity-60 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 text-[15px]">

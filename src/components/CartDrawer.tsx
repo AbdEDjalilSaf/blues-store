@@ -5,8 +5,9 @@ import { useCart, useShopActions } from '../store/shop';
 export default function CartDrawer({ onCheckout }: { onCheckout: () => void }) {
   const { cart, cartOpen, subtotal, cartCount } = useCart();
   const { setCartOpen, updateQty, removeFromCart } = useShopActions();
-  const shipping = subtotal >= 300 || subtotal === 0 ? 0 : 25;
+  const shipping = subtotal >= 10000 || subtotal === 0 ? 0 : 25;
   const total = subtotal + shipping;
+  const showShipping = subtotal >= 10000;
 
   if (!cartOpen) return null;
   return (
@@ -49,8 +50,12 @@ export default function CartDrawer({ onCheckout }: { onCheckout: () => void }) {
             </div>
             <div className="border-t-2 border-dashed border-[#0f2f52]/15 bg-white p-5 space-y-2">
               <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/70"><span>المجموع الفرعي</span><span>{formatPrice(subtotal)}</span></div>
-              <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/70"><span>الشحن</span><span className={shipping === 0 ? 'text-[#1d6fd1] font-black' : ''}>{shipping === 0 ? 'مجاني' : formatPrice(shipping)}</span></div>
-              {shipping > 0 && <div className="text-[12px] font-black text-[#0f4c9c] bg-[#2f9de4]/15 rounded-xl px-3 py-2">أضف بقيمة {formatPrice(300 - subtotal)} للحصول على شحن مجاني</div>}
+              {showShipping && (
+                <>
+                  <div className="flex justify-between text-[13px] font-bold text-[#0f2f52]/70"><span>الشحن</span><span className={shipping === 0 ? 'text-[#1d6fd1] font-black' : ''}>{shipping === 0 ? 'مجاني' : formatPrice(shipping)}</span></div>
+                  {shipping > 0 && <div className="text-[12px] font-black text-[#0f4c9c] bg-[#2f9de4]/15 rounded-xl px-3 py-2">أضف بقيمة {formatPrice(10000 - subtotal)} للحصول على شحن مجاني</div>}
+                </>
+              )}
               <div className="flex justify-between font-black text-lg text-[#0f2f52] pt-1"><span>الإجمالي</span><span>{formatPrice(total)}</span></div>
               <button onClick={onCheckout} className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white font-black py-3.5 rounded-2xl transition-all active:scale-[.98] flex items-center justify-center gap-2">إتمام الطلب <ArrowLeft size={18} /></button>
               <button onClick={() => setCartOpen(false)} className="w-full text-[13px] font-black text-[#0f2f52]/60 hover:text-[#0f2f52] py-1">مواصلة التسوق</button>

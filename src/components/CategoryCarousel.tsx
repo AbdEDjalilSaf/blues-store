@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { fetchCategories, type Category } from '../lib/categoriesApi';
 
-const CATEGORIES = [
-  { id: 1, title: 'LDC 2026/27', pieces: 10116, image: '/images/jersey-brazil.webp', alt: 'قميص البرازيل الفينتاج ضمن فئة الأكثر بحثاً' },
-  { id: 2, title: 'PREMIER LEAGUE', pieces: 8538, image: '/images/jersey-liverpool.webp', alt: 'قميص ليفربول الفينتاج ضمن فئة الدوري الإنجليزي' },
-  { id: 3, title: 'LIGUE 1', pieces: 13407, image: '/images/jersey-milan.webp', alt: 'قميص ميلان الفينتاج ضمن فئة الدوري الإيطالي' },
-  { id: 4, title: 'MYSTERY BOXES', pieces: 5, image: '/images/jersey-barca.webp', alt: 'قميص برشلونة الفينتاج ضمن فئة صناديق الغموض' },
-  { id: 5, title: 'PSG THOMSO', pieces: 1442, image: '/images/jersey-france.webp', alt: 'قميص فرنسا الفينتاج ضمن فئة الأكثر طلباً' },
+const DEFAULT_CATEGORIES = [
+  { id: 1, title: 'LDC 2026/27', image: '/images/jersey-brazil.webp', alt: 'قميص البرازيل الفينتاج ضمن فئة الأكثر بحثاً' },
+  { id: 2, title: 'PREMIER LEAGUE', image: '/images/jersey-liverpool.webp', alt: 'قميص ليفربول الفينتاج ضمن فئة الدوري الإنجليزي' },
+  { id: 3, title: 'LIGUE 1', image: '/images/jersey-milan.webp', alt: 'قميص ميلان الفينتاج ضمن فئة الدوري الإيطالي' },
+  { id: 4, title: 'MYSTERY BOXES', image: '/images/jersey-barca.webp', alt: 'قميص برشلونة الفينتاج ضمن فئة صناديق الغموض' },
+  { id: 5, title: 'PSG THOMSO', image: '/images/jersey-france.webp', alt: 'قميص فرنسا الفينتاج ضمن فئة الأكثر طلباً' },
 ];
 
 /** How close to either edge before the previous/next buttons appear. */
@@ -19,6 +20,33 @@ export default function CategoryCarousel() {
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const apiCategories = await fetchCategories();
+        if (apiCategories.length > 0) {
+          // Merge API data with default data (keep images, pieces, etc. from defaults)
+          const merged = apiCategories.map((apiCat, index) => {
+            const fallback = DEFAULT_CATEGORIES[index % DEFAULT_CATEGORIES.length];
+            return {
+              ...fallback,
+              id: apiCat.id,
+              title: apiCat.name.toUpperCase(),
+              alt: `${apiCat.name} ضمن فئة الأكثر بحثاً`,
+            };
+          });
+          setCategories(merged);
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+        // Keep default categories on error
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const syncEdges = useCallback(() => {
     const el = track.current;
@@ -120,7 +148,7 @@ export default function CategoryCarousel() {
             }`}
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', touchAction: 'pan-x pan-y' }}
           >
-            {CATEGORIES.map((category) => (
+            {categories.map((category) => (
               <li key={category.id} className="flex-shrink-0 w-[200px] sm:w-[240px] md:w-[280px] snap-start group">
                 <a href="#shop" className="block relative h-32 sm:h-40 md:h-48 rounded-2xl overflow-hidden bg-[#0f2f52]">
                   <img
@@ -136,9 +164,6 @@ export default function CategoryCarousel() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0f2f52]/90 via-[#0f2f52]/40 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">
                     <h3 className="font-black text-white text-lg md:text-xl mb-1">{category.title}</h3>
-                    <p className="text-[#bfe1f8] text-xs md:text-sm font-bold">
-                      {category.pieces.toLocaleString('en-US')} PIECES
-                    </p>
                   </div>
                 </a>
               </li>
