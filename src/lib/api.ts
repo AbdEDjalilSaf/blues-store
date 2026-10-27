@@ -148,6 +148,9 @@ export interface ApiProductImage {
 
   path: string;
 
+  /** Absolute public URL supplied by the API; preferred when present. */
+  url?: string | null;
+
   sort_order: number;
 
   is_primary: boolean;
@@ -302,6 +305,34 @@ export function resolveImageUrl(path: string): string {
 
 
 
+/**
+
+ * Resolve an API image to a loadable URL. The API may already expose an
+
+ * absolute `url` (public disk); fall back to building one from `path`.
+
+ */
+
+export function resolveApiImage(image: ApiProductImage | null | undefined): string {
+
+  if (!image) return '';
+
+  const url = (image.url ?? '').trim();
+
+  if (url) {
+
+    if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:')) return url;
+
+    return resolveImageUrl(url);
+
+  }
+
+  return resolveImageUrl(image.path);
+
+}
+
+
+
 function eraFromYear(year: number): string {
 
   const decade = Math.floor(Number(year) / 10) * 10;
@@ -324,7 +355,7 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
 
     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
 
-  const resolved = primary ? resolveImageUrl(primary.path) : '';
+  const resolved = resolveApiImage(primary);
 
   const stock = Number(raw.stock) || 0;
 
@@ -816,35 +847,27 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
 
   const form = buildProductForm(input);
 
-  try {
+  return sendProductForm(
 
-    return await sendProductForm(
+    PRODUCTS_ENDPOINT,
 
-      PRODUCTS_ENDPOINT,
+    'POST',
 
-      'POST',
+    form,
 
-      form,
+    {
 
-      {
+      timeoutLabel: 'إنشاء المنتج',
 
-        timeoutLabel: 'إنشاء المنتج',
+      failureAction: 'فشل إنشاء المنتج',
 
-        failureAction: 'فشل إنشاء المنتج',
+      parseError: 'تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.',
 
-        parseError: 'تم إنشاء المنتج لكن تعذّرت قراءة استجابة الخادم.',
+      invalidError: 'استجابة غير صالحة من الخادم بعد إنشاء المنتج.'
 
-        invalidError: 'استجابة غير صالحة من الخادم بعد إنشاء المنتج.'
+    }
 
-      }
-
-    );
-
-  } catch (err) {
-
-    throw err;
-
-  }
+  );
 
 }
 

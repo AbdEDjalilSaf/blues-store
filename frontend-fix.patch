@@ -1,0 +1,296 @@
+diff --git a/src/admin/ProductDetailsModal.tsx b/src/admin/ProductDetailsModal.tsx
+index 3e0212b..9912ec5 100644
+--- a/src/admin/ProductDetailsModal.tsx
++++ b/src/admin/ProductDetailsModal.tsx
+@@ -10,8 +10,9 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
+   if (!product) return null;
+ 
+   const images = product.images ?? [];
+-  const primaryImage = images.length > 0
+-    ? resolveImageUrl(images.find((img) => img.is_primary)?.path || images[0].path)
++  const primary = images.find((img) => img.is_primary) ?? images[0];
++  const primaryImage = primary
++    ? resolveImageUrl(primary.path, primary.url)
+     : fallbackImage(product.team);
+ 
+   return (
+@@ -45,7 +46,7 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
+                   {images.map((img) => (
+                     <img
+                       key={img.id}
+-                      src={resolveImageUrl(img.path)}
++                      src={resolveImageUrl(img.path, img.url)}
+                       alt=""
+                       onError={(e) => { e.currentTarget.src = fallbackImage(product.team); }}
+                       className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+diff --git a/src/admin/ProductFormModal.tsx b/src/admin/ProductFormModal.tsx
+index 8c9e810..a17c4a0 100644
+--- a/src/admin/ProductFormModal.tsx
++++ b/src/admin/ProductFormModal.tsx
+@@ -24,11 +24,6 @@ function slugify(value: string): string {
+     .replace(/^-+|-+$/g, '');
+ }
+ 
+-function discountFor(price: number, oldPrice: number): number {
+-  if (!oldPrice || oldPrice <= price) return 0;
+-  return Math.round(((oldPrice - price) / oldPrice) * 100);
+-}
+-
+ /** Swap to a placeholder when a stored image file can't be loaded. */
+ function handleImageError(event: SyntheticEvent<HTMLImageElement>, team: string): void {
+   const img = event.currentTarget;
+@@ -54,6 +49,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+     is_active: product ? product.is_active : true,
+   }));
+   const [files, setFiles] = useState<File[]>([]);
++  const [replaceImages, setReplaceImages] = useState(false);
+   const [error, setError] = useState('');
+   const [submitting, setSubmitting] = useState(false);
+   const [success, setSuccess] = useState(false);
+@@ -75,7 +71,10 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+     if (fileInputRef.current) fileInputRef.current.value = '';
+   };
+ 
+-  const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
++  const removeFile = (index: number) => {
++    if (files.length <= 1) setReplaceImages(false);
++    setFiles((prev) => prev.filter((_, i) => i !== index));
++  };
+ 
+   const validate = (): string | null => {
+     if (!form.name.trim()) return 'الرجاء إدخال اسم المنتج.';
+@@ -91,12 +90,6 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+     return null;
+   };
+ 
+-  const resetForm = () => {
+-    setError('');
+-    setSuccess(false);
+-    setSubmitting(false);
+-  };
+-
+   const onSubmit = async (e: FormEvent) => {
+     e.preventDefault();
+     if (submitting) return;
+@@ -150,6 +143,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+           category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
+           is_active: form.is_active,
+           images: files.length > 0 ? files : undefined,
++          replace_images: files.length > 0 && replaceImages,
+         });
+         onUpdated(updated);
+         setSuccess(true);
+@@ -327,7 +321,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+                   {(product.images ?? []).map((img) => (
+                     <img
+                       key={img.id}
+-                      src={resolveImageUrl(img.path)}
++                      src={resolveImageUrl(img.path, img.url)}
+                       alt=""
+                       onError={(e) => handleImageError(e, product.team)}
+                       className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+@@ -359,6 +353,21 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+                 </div>
+               )}
+ 
++              {!isNew && files.length > 0 && (product.images?.length ?? 0) > 0 && (
++                <label className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 mb-3 cursor-pointer">
++                  <input
++                    type="checkbox"
++                    checked={replaceImages}
++                    onChange={(e) => setReplaceImages(e.target.checked)}
++                    disabled={submitting}
++                    className="mt-0.5 accent-[#0f2f52]"
++                  />
++                  <span className="text-xs font-bold text-amber-900">
++                    استبدال الصور الحالية بالصور الجديدة، واستخدم هذا الخيار إذا كانت الصور القديمة لا تظهر.
++                  </span>
++                </label>
++              )}
++
+               <input
+                 ref={fileInputRef}
+                 type="file"
+@@ -382,7 +391,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
+               <p className="text-xs font-bold text-gray-400 mt-1">
+                 {isNew
+                   ? `ارفع من ${MIN_IMAGES} إلى ${MAX_IMAGES} صور مع المنتج الجديد.`
+-                  : 'تُدار صور المنتجات الحالية من الخادم.'}
++                  : 'يمكنك إلحاق صور جديدة أو تحديد استبدال المعرض الحالي.'}
+               </p>
+             </div>
+ 
+diff --git a/src/admin/ProductsPage.tsx b/src/admin/ProductsPage.tsx
+index 4a9be7f..d4571ec 100644
+--- a/src/admin/ProductsPage.tsx
++++ b/src/admin/ProductsPage.tsx
+@@ -18,7 +18,7 @@ function primaryImage(product: ApiProduct): string {
+   const primary =
+     images.find((img) => img.is_primary) ??
+     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
+-  const resolved = resolveImageUrl(primary.path);
++  const resolved = resolveImageUrl(primary.path, primary.url);
+   return resolved || fallbackImage(product.team);
+ }
+ 
+diff --git a/src/lib/api.ts b/src/lib/api.ts
+index 2270163..51a3a34 100644
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -148,6 +148,10 @@ export interface ApiProductImage {
+ 
+   path: string;
+ 
++  /** Absolute public URL supplied by the API; optional for older deployments. */
++
++  url?: string;
++
+   sort_order: number;
+ 
+   is_primary: boolean;
+@@ -282,12 +286,48 @@ export function fallbackImage(team: string): string {
+ 
+ 
+ 
+-/** Turn a stored image path into a URL the browser can load. */
++/** Turn a stored path or API URL into a loadable URL on the active API host. */
+ 
+-export function resolveImageUrl(path: string): string {
++export function resolveImageUrl(path: string, imageUrl?: string): string {
+ 
+   const value = (path ?? '').trim();
+ 
++  const suppliedUrl = (imageUrl ?? '').trim();
++
++  if (suppliedUrl) {
++
++    if (/^(https?:)?\/\//i.test(suppliedUrl)) {
++
++      try {
++
++        const parsed = new URL(suppliedUrl, API_BASE_URL);
++
++        // Older API deployments returned a stale Render hostname. Local public
++        // disk links should always use the currently configured API origin.
++        const storageIndex = parsed.pathname.indexOf('/storage/');
++
++        if (storageIndex >= 0) {
++
++          return `${API_BASE_URL}${parsed.pathname.slice(storageIndex)}${parsed.search}${parsed.hash}`;
++
++        }
++
++        return suppliedUrl;
++
++      } catch {
++
++        // Fall through to the stable stored path.
++
++      }
++
++    } else if (suppliedUrl.startsWith('/storage/')) {
++
++      return `${API_BASE_URL}${suppliedUrl}`;
++
++    }
++
++  }
++
+   if (!value) return '';
+ 
+   if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:')) return value;
+@@ -324,7 +364,7 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
+ 
+     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
+ 
+-  const resolved = primary ? resolveImageUrl(primary.path) : '';
++  const resolved = primary ? resolveImageUrl(primary.path, primary.url) : '';
+ 
+   const stock = Number(raw.stock) || 0;
+ 
+@@ -602,6 +642,10 @@ export interface CreateProductInput {
+ 
+   images?: File[];
+ 
++  /** Replace the existing image gallery with the uploaded files on update. */
++
++  replace_images?: boolean;
++
+ }
+ 
+ 
+@@ -676,6 +720,8 @@ function buildProductForm(input: CreateProductInput): FormData {
+ 
+   form.append('is_active', input.is_active ? '1' : '0');
+ 
++  if (input.replace_images) form.append('replace_images', '1');
++
+   if (input.size != null && input.size.trim()) {
+ 
+     form.append('size', input.size.trim());
+@@ -724,6 +770,10 @@ async function sendProductForm(
+ 
+   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+ 
++  // PHP only populates $_FILES for multipart POST requests. Laravel's method
++  // override keeps the PATCH route while ensuring uploaded files are parsed.
++  if (method === 'PATCH') form.append('_method', 'PATCH');
++
+ 
+ 
+   let response: Response;
+@@ -732,7 +782,7 @@ async function sendProductForm(
+ 
+     response = await fetch(url, {
+ 
+-      method,
++      method: method === 'PATCH' ? 'POST' : method,
+ 
+       // NB: no Content-Type — the browser sets the multipart boundary itself.
+ 
+@@ -816,9 +866,7 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
+ 
+   const form = buildProductForm(input);
+ 
+-  try {
+-
+-    return await sendProductForm(
++  return sendProductForm(
+ 
+       PRODUCTS_ENDPOINT,
+ 
+@@ -840,23 +888,20 @@ export async function createProduct(input: CreateProductInput): Promise<ApiProdu
+ 
+     );
+ 
+-  } catch (err) {
+-
+-    throw err;
+-
+-  }
+-
+ }
+ 
+ 
+ 
+ /**
+ 
+- * Update a product via `PATCH /api/products/{idOrSlug}` (multipart/form-data).
++ * Update a product via method-spoofed `POST /api/products/{idOrSlug}`
++ * (multipart/form-data with `_method=PATCH`) so PHP parses uploaded files.
+ 
+- * `images[]` is only appended when new files are picked, so the server keeps
++ * `images[]` is only appended when new files are picked. Existing images stay
+ 
+- * existing images otherwise (replace semantics when files are sent).
++ * by default; `replace_images=1` removes the previous gallery after new files
++
++ * have been stored successfully.
+ 
+  * Throws {@link ApiError} with a user-facing Arabic message on any failure.
+ 
+@@ -967,4 +1012,3 @@ export async function deleteProduct(idOrSlug: number | string): Promise<void> {
+   // 204 No Content is the expected success response.
+ 
+ }
+-

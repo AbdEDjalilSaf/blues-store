@@ -5,6 +5,7 @@ const CATEGORIES_ENDPOINT = `${API_BASE_URL}/api/categories`;
 export interface Category {
   id: number;
   name: string;
+  image?: string;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +80,7 @@ function parseCategory(data: unknown): Category | null {
   return {
     id: obj.id,
     name: obj.name,
+    image: typeof obj.image === 'string' ? obj.image : undefined,
     created_at: obj.created_at,
     updated_at: obj.updated_at,
   };

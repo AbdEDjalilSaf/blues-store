@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
 import { AlertCircle, CheckCircle2, ImagePlus, Loader2, Upload, X } from 'lucide-react';
-import { createProduct, fallbackImage, resolveImageUrl, updateProduct, type ApiProduct } from '../lib/api';
+import { createProduct, fallbackImage, resolveApiImage, updateProduct, type ApiProduct } from '../lib/api';
 
 interface Props {
   /** `null` creates a new product (POST); an existing row edits it locally. */
@@ -327,7 +327,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                   {(product.images ?? []).map((img) => (
                     <img
                       key={img.id}
-                      src={resolveImageUrl(img.path)}
+                      src={resolveApiImage(img)}
                       alt=""
                       onError={(e) => handleImageError(e, product.team)}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-200"

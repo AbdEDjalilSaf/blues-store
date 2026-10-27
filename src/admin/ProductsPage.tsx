@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { CheckCircle2, Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { deleteProduct, fetchProduct, formatPrice, resolveImageUrl, fallbackImage, type ApiProduct } from '../lib/api';
+import { deleteProduct, fetchProduct, formatPrice, resolveApiImage, fallbackImage, type ApiProduct } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { resetAdminProducts, useAdminProducts } from './productCache';
 import Pagination from './Pagination';
@@ -18,7 +18,7 @@ function primaryImage(product: ApiProduct): string {
   const primary =
     images.find((img) => img.is_primary) ??
     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
-  const resolved = resolveImageUrl(primary.path);
+  const resolved = resolveApiImage(primary);
   return resolved || fallbackImage(product.team);
 }
 
