@@ -10,8 +10,9 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
   if (!product) return null;
 
   const images = product.images ?? [];
+  const primary = images.find((img) => img.is_primary) || images[0];
   const primaryImage = images.length > 0
-    ? resolveImageUrl(images.find((img) => img.is_primary)?.path || images[0].path)
+    ? (primary.url?.trim() || resolveImageUrl(primary.path))
     : fallbackImage(product.team);
 
   return (
@@ -45,7 +46,7 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
                   {images.map((img) => (
                     <img
                       key={img.id}
-                      src={resolveImageUrl(img.path)}
+                      src={img.url?.trim() || resolveImageUrl(img.path)}
                       alt=""
                       onError={(e) => { e.currentTarget.src = fallbackImage(product.team); }}
                       className="w-full aspect-square object-cover rounded-lg border border-gray-200"

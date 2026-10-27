@@ -18,7 +18,7 @@ function primaryImage(product: ApiProduct): string {
   const primary =
     images.find((img) => img.is_primary) ??
     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
-  const resolved = resolveImageUrl(primary.path);
+  const resolved = primary.url?.trim() || resolveImageUrl(primary.path);
   return resolved || fallbackImage(product.team);
 }
 

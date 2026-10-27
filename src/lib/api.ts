@@ -148,6 +148,8 @@ export interface ApiProductImage {
 
   path: string;
 
+  url?: string;
+
   sort_order: number;
 
   is_primary: boolean;
@@ -324,7 +326,7 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
 
     [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
 
-  const resolved = primary ? resolveImageUrl(primary.path) : '';
+  const resolved = primary?.url?.trim() || (primary ? resolveImageUrl(primary.path) : '');
 
   const stock = Number(raw.stock) || 0;
 
@@ -967,4 +969,3 @@ export async function deleteProduct(idOrSlug: number | string): Promise<void> {
   // 204 No Content is the expected success response.
 
 }
-

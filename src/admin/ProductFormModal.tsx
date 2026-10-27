@@ -327,7 +327,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                   {(product.images ?? []).map((img) => (
                     <img
                       key={img.id}
-                      src={resolveImageUrl(img.path)}
+                      src={img.url?.trim() || resolveImageUrl(img.path)}
                       alt=""
                       onError={(e) => handleImageError(e, product.team)}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-200"
