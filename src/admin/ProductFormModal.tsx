@@ -12,8 +12,8 @@ interface Props {
   onUpdated: (product: ApiProduct) => void;
 }
 
-/** A product needs a small gallery, but the server caps uploads per request. */
-const MIN_IMAGES = 2;
+/** The server allows a single primary image and caps uploads per request. */
+const MIN_IMAGES = 1;
 const MAX_IMAGES = 8;
 
 function slugify(value: string): string {
@@ -67,8 +67,11 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
 
   const addFiles = (picked: FileList | null) => {
     if (!picked?.length) return;
-    setFiles((prev) => [...prev, ...Array.from(picked)].slice(0, MAX_IMAGES));
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    const selected = Array.from(picked).filter((file) => file.type.startsWith('image/'));
+    if (selected.length === 0) return;
+
+    setFiles((prev) => [...prev, ...selected].slice(0, MAX_IMAGES));
   };
 
   const removeFile = (index: number) => {
@@ -100,9 +103,21 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     e.preventDefault();
     if (submitting) return;
 
+    // Keep the input as a fallback source. This prevents browsers that update
+    // the native FileList before React state settles from submitting no files.
+    const selectedFiles = files.length > 0
+      ? files
+      : Array.from(fileInputRef.current?.files ?? []);
+
     const invalid = validate();
-    if (invalid) {
-      setError(invalid);
+    const imageError = isNew && selectedFiles.length < MIN_IMAGES
+      ? `الرجاء اختيار صورة واحدة على الأقل للمنتج.`
+      : !isNew && replaceImages && selectedFiles.length === 0
+        ? 'اختر صورة جديدة واحدة على الأقل لاستبدال الصور الحالية.'
+        : null;
+
+    if (invalid || imageError) {
+      setError(imageError ?? invalid ?? 'تحقّق من البيانات المدخلة.');
       return;
     }
 
@@ -132,13 +147,13 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
 
     try {
       if (isNew) {
-        const created = await createProduct({ ...payload, images: files });
+        const created = await createProduct({ ...payload, images: selectedFiles });
         onCreated(created);
       } else {
         const updated = await updateProduct(product!.id, {
           ...payload,
-          images: files.length > 0 ? files : undefined,
-          replace_images: files.length > 0 && replaceImages,
+          images: selectedFiles.length > 0 ? selectedFiles : undefined,
+          replace_images: selectedFiles.length > 0 && replaceImages,
         });
         onUpdated(updated);
       }
@@ -369,7 +384,12 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
               />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  // Allow selecting the same file(s) again after removing them
+                  // or after a previous failed submission.
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  fileInputRef.current?.click();
+                }}
                 disabled={submitting || files.length >= MAX_IMAGES}
                 className="w-full bg-gray-100 hover:bg-gray-200 text-[#0f2f52] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-60"
               >
