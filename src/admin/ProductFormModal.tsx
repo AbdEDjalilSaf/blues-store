@@ -84,7 +84,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
 
   const hasExistingImages = !isNew && (product.images?.length ?? 0) > 0;
 
-  const validate = (): string | null => {
+  const validate = (selectedFiles: File[] = files): string | null => {
     if (!form.name.trim()) return 'الرجاء إدخال اسم المنتج.';
     if (!form.team.trim()) return 'الرجاء إدخال اسم الفريق.';
     const year = Number(form.year);
@@ -93,9 +93,9 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     if (!Number.isFinite(price) || price <= 0) return 'الرجاء إدخال سعر صحيح أكبر من صفر.';
     const stock = Number(form.stock);
     if (!Number.isInteger(stock) || stock < 0) return 'الرجاء إدخال كمية مخزون صحيحة.';
-    if (isNew && files.length < MIN_IMAGES) return 'الرجاء رفع صورتين على الأقل للمنتج.';
-    if (!isNew && replaceImages && files.length === 0) return 'اختر صورة جديدة واحدة على الأقل لاستبدال الصور الحالية.';
-    if (files.length > MAX_IMAGES) return `لا يمكن رفع أكثر من ${MAX_IMAGES} صور.`;
+    if (isNew && selectedFiles.length < MIN_IMAGES) return 'الرجاء اختيار صورة واحدة على الأقل للمنتج.';
+    if (!isNew && replaceImages && selectedFiles.length === 0) return 'اختر صورة جديدة واحدة على الأقل لاستبدال الصور الحالية.';
+    if (selectedFiles.length > MAX_IMAGES) return `لا يمكن رفع أكثر من ${MAX_IMAGES} صور.`;
     return null;
   };
 
@@ -109,15 +109,10 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
       ? files
       : Array.from(fileInputRef.current?.files ?? []);
 
-    const invalid = validate();
-    const imageError = isNew && selectedFiles.length < MIN_IMAGES
-      ? `الرجاء اختيار صورة واحدة على الأقل للمنتج.`
-      : !isNew && replaceImages && selectedFiles.length === 0
-        ? 'اختر صورة جديدة واحدة على الأقل لاستبدال الصور الحالية.'
-        : null;
+    const invalid = validate(selectedFiles);
 
-    if (invalid || imageError) {
-      setError(imageError ?? invalid ?? 'تحقّق من البيانات المدخلة.');
+    if (invalid) {
+      setError(invalid);
       return;
     }
 
