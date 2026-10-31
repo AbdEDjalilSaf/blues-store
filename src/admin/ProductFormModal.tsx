@@ -3,12 +3,12 @@ import { AlertCircle, CheckCircle2, ImagePlus, Loader2, Upload, X } from 'lucide
 import { createProduct, fallbackImage, resolveApiImage, updateProduct, type ApiProduct } from '../lib/api';
 
 interface Props {
-  /** `null` creates a new product (POST); an existing row edits it locally. */
+  /** `null` creates a new product (POST); an existing row edits it. */
   product: ApiProduct | null;
   onClose: () => void;
   /** Fired after the API confirms creation (carries the server row). */
   onCreated: (product: ApiProduct) => void;
-  /** Fired after a local edit (no update endpoint is exposed yet). */
+  /** Fired after the API confirms an update (carries the server row). */
   onUpdated: (product: ApiProduct) => void;
 }
 
@@ -22,11 +22,6 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9\u0600-\u06FF]+/g, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-function discountFor(price: number, oldPrice: number): number {
-  if (!oldPrice || oldPrice <= price) return 0;
-  return Math.round(((oldPrice - price) / oldPrice) * 100);
 }
 
 /** Swap to a placeholder when a stored image file can't be loaded. */
@@ -54,6 +49,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     is_active: product ? product.is_active : true,
   }));
   const [files, setFiles] = useState<File[]>([]);
+  const [replaceImages, setReplaceImages] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -75,7 +71,15 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = (index: number) => {
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) setReplaceImages(false);
+      return next;
+    });
+  };
+
+  const hasExistingImages = !isNew && (product.images?.length ?? 0) > 0;
 
   const validate = (): string | null => {
     if (!form.name.trim()) return 'الرجاء إدخال اسم المنتج.';
@@ -87,14 +91,9 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     const stock = Number(form.stock);
     if (!Number.isInteger(stock) || stock < 0) return 'الرجاء إدخال كمية مخزون صحيحة.';
     if (isNew && files.length < MIN_IMAGES) return 'الرجاء رفع صورتين على الأقل للمنتج.';
+    if (!isNew && replaceImages && files.length === 0) return 'اختر صورة جديدة واحدة على الأقل لاستبدال الصور الحالية.';
     if (files.length > MAX_IMAGES) return `لا يمكن رفع أكثر من ${MAX_IMAGES} صور.`;
     return null;
-  };
-
-  const resetForm = () => {
-    setError('');
-    setSuccess(false);
-    setSubmitting(false);
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -114,47 +113,37 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
     const categoryId = form.category_id ? Number(form.category_id) : null;
     const slug = form.slug.trim() || slugify(name);
 
+    const payload = {
+      name,
+      slug,
+      team: form.team.trim(),
+      year: Number(form.year),
+      description: form.description.trim(),
+      price,
+      old_price: oldPrice != null && Number.isFinite(oldPrice) ? oldPrice : null,
+      stock,
+      size: form.size.trim() || null,
+      category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
+      is_active: form.is_active,
+    };
+
     setError('');
     setSubmitting(true);
 
     try {
       if (isNew) {
-        const created = await createProduct({
-          name,
-          slug,
-          team: form.team.trim(),
-          year: Number(form.year),
-          description: form.description.trim(),
-          price,
-          old_price: oldPrice != null && Number.isFinite(oldPrice) ? oldPrice : null,
-          stock,
-          size: form.size.trim() || null,
-          category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
-          is_active: form.is_active,
-          images: files,
-        });
+        const created = await createProduct({ ...payload, images: files });
         onCreated(created);
-        setSuccess(true);
-        setTimeout(() => onClose(), 1500);
       } else {
         const updated = await updateProduct(product!.id, {
-          name,
-          slug,
-          team: form.team.trim(),
-          year: Number(form.year),
-          description: form.description.trim(),
-          price,
-          old_price: oldPrice != null && Number.isFinite(oldPrice) ? oldPrice : null,
-          stock,
-          size: form.size.trim() || null,
-          category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
-          is_active: form.is_active,
+          ...payload,
           images: files.length > 0 ? files : undefined,
+          replace_images: files.length > 0 && replaceImages,
         });
         onUpdated(updated);
-        setSuccess(true);
-        setTimeout(() => onClose(), 1500);
       }
+      setSuccess(true);
+      setTimeout(() => onClose(), 1500);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'تعذّر حفظ المنتج. حاول مجدداً.');
       setSubmitting(false);
@@ -322,17 +311,22 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
             <div className="sm:col-span-2">
               <label className="block text-sm font-black text-[#0f2f52] mb-1.5">الصور</label>
 
-              {!isNew && (product.images?.length ?? 0) > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {(product.images ?? []).map((img) => (
-                    <img
-                      key={img.id}
-                      src={resolveApiImage(img)}
-                      alt=""
-                      onError={(e) => handleImageError(e, product.team)}
-                      className="w-16 h-16 rounded-lg object-cover border border-gray-200"
-                    />
-                  ))}
+              {hasExistingImages && (
+                <div className="mb-3">
+                  <p className="text-xs font-bold text-gray-500 mb-1.5">
+                    الصور الحالية{replaceImages && files.length > 0 ? ' (ستُحذف)' : ''}
+                  </p>
+                  <div className={`flex flex-wrap gap-2 ${replaceImages && files.length > 0 ? 'opacity-40' : ''}`}>
+                    {(product.images ?? []).map((img) => (
+                      <img
+                        key={img.id}
+                        src={resolveApiImage(img)}
+                        alt=""
+                        onError={(e) => handleImageError(e, product.team)}
+                        className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -345,6 +339,11 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                         alt=""
                         className="w-16 h-16 rounded-lg object-cover border border-gray-200"
                       />
+                      {i === 0 && (
+                        <span className="absolute bottom-0 inset-x-0 bg-[#0f2f52] text-white text-[10px] font-black text-center rounded-b-lg py-0.5">
+                          أساسية
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeFile(i)}
@@ -352,7 +351,7 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                         className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 disabled:opacity-40"
                         aria-label="إزالة الصورة"
                       >
-                        <X size={12} /> 
+                        <X size={12} />
                       </button>
                     </div>
                   ))}
@@ -377,12 +376,33 @@ export default function ProductFormModal({ product, onClose, onCreated, onUpdate
                 <ImagePlus size={18} />
                 {files.length > 0
                   ? `تم اختيار ${files.length} صورة`
-                  : `رفع الصور (${MIN_IMAGES}–${MAX_IMAGES})`}
+                  : isNew
+                    ? `رفع الصور (${MIN_IMAGES}–${MAX_IMAGES})`
+                    : 'إضافة صور جديدة'}
               </button>
+
+              {!isNew && files.length > 0 && hasExistingImages && (
+                <label className="flex items-start gap-2 mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={replaceImages}
+                    onChange={(e) => setReplaceImages(e.target.checked)}
+                    disabled={submitting}
+                    className="w-5 h-5 mt-0.5 accent-[#0f2f52] disabled:opacity-60"
+                  />
+                  <span className="text-sm font-black text-[#0f2f52]">
+                    استبدال الصور الحالية بالصور الجديدة
+                    <span className="block text-xs font-bold text-gray-400">
+                      تُحذف الصور القديمة وتصبح أول صورة مختارة هي الأساسية.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <p className="text-xs font-bold text-gray-400 mt-1">
                 {isNew
-                  ? `ارفع من ${MIN_IMAGES} إلى ${MAX_IMAGES} صور مع المنتج الجديد.`
-                  : 'تُدار صور المنتجات الحالية من الخادم.'}
+                  ? `ارفع من ${MIN_IMAGES} إلى ${MAX_IMAGES} صور مع المنتج الجديد. الصورة الأولى هي الأساسية.`
+                  : 'اترك الحقل فارغاً للإبقاء على الصور الحالية، أو اختر صوراً جديدة لإضافتها أو استبدالها.'}
               </p>
             </div>
 
