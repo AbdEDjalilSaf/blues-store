@@ -508,6 +508,10 @@ export async function deleteProduct(idOrSlug: number | string): Promise<void> {
     throw new ApiError('المنتج غير موجود. ربما تم حذفه بالفعل.', response.status);
   }
 
+  if (response.status === 401 || response.status === 403) {
+    throw new ApiError('غير مصرّح لك بحذف المنتجات.', response.status);
+  }
+
   if (!response.ok) {
     throw new ApiError(`فشل حذف المنتج (رمز ${response.status}).`, response.status);
   }
