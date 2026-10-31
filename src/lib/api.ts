@@ -147,6 +147,12 @@ export function resolveImageUrl(path: string): string {
   if (!value) return '';
   if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:')) return value;
   const clean = value.replace(/^\/+/, '');
+  // Appwrite paths are opaque storage references. The backend must return the
+  // signed/public /view URL; never turn them into a Render /storage URL.
+  if (clean.startsWith('appwrite:') || clean.startsWith('appwrite://')) return '';
+  // With Appwrite enabled, a legacy `products/...` path is not a browser URL.
+  // Returning an empty string lets callers use the deterministic fallback image.
+  if (clean.startsWith('products/')) return '';
   if (clean.startsWith('storage/')) return `${API_BASE_URL}/${clean}`;
   return `${API_BASE_URL}/storage/${clean}`;
 }
