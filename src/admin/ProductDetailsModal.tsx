@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { formatPrice, resolveImageUrl, fallbackImage, type ApiProduct } from '../lib/api';
+import { formatPrice, resolveApiImage, fallbackImage, type ApiProduct } from '../lib/api';
 
 interface Props {
   product: ApiProduct | null;
@@ -12,7 +12,7 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
   const images = product.images ?? [];
   const primary = images.find((img) => img.is_primary) || images[0];
   const primaryImage = images.length > 0
-    ? (primary.url?.trim() || resolveImageUrl(primary.path))
+    ? (primary.url?.trim() || resolveApiImage(primary))
     : fallbackImage(product.team);
 
   return (
@@ -46,7 +46,7 @@ export default function ProductDetailsModal({ product, onClose }: Props) {
                   {images.map((img) => (
                     <img
                       key={img.id}
-                      src={img.url?.trim() || resolveImageUrl(img.path)}
+                      src={img.url?.trim() || resolveApiImage(img)}
                       alt=""
                       onError={(e) => { e.currentTarget.src = fallbackImage(product.team); }}
                       className="w-full aspect-square object-cover rounded-lg border border-gray-200"

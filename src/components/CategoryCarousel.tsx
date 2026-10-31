@@ -3,11 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchCategories, type Category } from '../lib/categoriesApi';
 
 const DEFAULT_CATEGORIES = [
-  { id: 1, title: 'LDC 2026/27', image: '/images/jersey-brazil.webp', alt: 'قميص البرازيل الفينتاج ضمن فئة الأكثر بحثاً' },
-  { id: 2, title: 'PREMIER LEAGUE', image: '/images/jersey-liverpool.webp', alt: 'قميص ليفربول الفينتاج ضمن فئة الدوري الإنجليزي' },
-  { id: 3, title: 'LIGUE 1', image: '/images/jersey-milan.webp', alt: 'قميص ميلان الفينتاج ضمن فئة الدوري الإيطالي' },
-  { id: 4, title: 'MYSTERY BOXES', image: '/images/jersey-barca.webp', alt: 'قميص برشلونة الفينتاج ضمن فئة صناديق الغموض' },
-  { id: 5, title: 'PSG THOMSO', image: '/images/jersey-france.webp', alt: 'قميص فرنسا الفينتاج ضمن فئة الأكثر طلباً' },
+  { id: 1, title: 'LDC 2026/27', pieces: 10116, image: '/images/jersey-brazil.webp', alt: 'قميص البرازيل الفينتاج ضمن فئة الأكثر بحثاً' },
+  { id: 2, title: 'PREMIER LEAGUE', pieces: 8538, image: '/images/jersey-liverpool.webp', alt: 'قميص ليفربول الفينتاج ضمن فئة الدوري الإنجليزي' },
+  { id: 3, title: 'LIGUE 1', pieces: 13407, image: '/images/jersey-milan.webp', alt: 'قميص ميلان الفينتاج ضمن فئة الدوري الإيطالي' },
+  { id: 4, title: 'MYSTERY BOXES', pieces: 5, image: '/images/jersey-barca.webp', alt: 'قميص برشلونة الفينتاج ضمن فئة صناديق الغموض' },
+  { id: 5, title: 'PSG THOMSO', pieces: 1442, image: '/images/jersey-france.webp', alt: 'قميص فرنسا الفينتاج ضمن فئة الأكثر طلباً' },
 ];
 
 /** How close to either edge before the previous/next buttons appear. */
@@ -27,13 +27,14 @@ export default function CategoryCarousel() {
       try {
         const apiCategories = await fetchCategories();
         if (apiCategories.length > 0) {
-          // Merge API data with default data (keep images, pieces, etc. from defaults)
-          const merged = apiCategories.map((apiCat, index) => {
+          // Merge API data with default data (use API image if available, otherwise fallback)
+          const merged = apiCategories.map((apiCat: Category, index: number) => {
             const fallback = DEFAULT_CATEGORIES[index % DEFAULT_CATEGORIES.length];
             return {
               ...fallback,
               id: apiCat.id,
               title: apiCat.name.toUpperCase(),
+              image: apiCat.image || fallback.image,
               alt: `${apiCat.name} ضمن فئة الأكثر بحثاً`,
             };
           });
@@ -164,6 +165,9 @@ export default function CategoryCarousel() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0f2f52]/90 via-[#0f2f52]/40 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">
                     <h3 className="font-black text-white text-lg md:text-xl mb-1">{category.title}</h3>
+                    <p className="text-[#bfe1f8] text-xs md:text-sm font-bold">
+                      {category.pieces.toLocaleString('en-US')} PIECES
+                    </p>
                   </div>
                 </a>
               </li>
