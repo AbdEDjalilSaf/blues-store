@@ -24,6 +24,8 @@ export default function ProductModal({ p, onClose }: Props) {
   const [form, setForm] = useState({ author: '', rating: 5, text: '' });
   const [sending, setSending] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const gallery = p.imageGallery?.length ? p.imageGallery : [p.image];
+  const [activeImage, setActiveImage] = useState(gallery[0]);
   const panel = useRef<HTMLDivElement | null>(null);
 
   // Scroll lock + Escape to close. Pure external-system work, no setState.
@@ -77,22 +79,48 @@ export default function ProductModal({ p, onClose }: Props) {
         <button onClick={onClose} className="absolute top-3 left-3 z-10 w-10 h-10 grid place-items-center rounded-full bg-[#0f2f52] text-white hover:bg-[#1565c0]" aria-label="إغلاق"><X size={20} /></button>
         <div className="grid md:grid-cols-2">
           <div className="relative bg-[#e7eff8] p-4 md:p-6">
-            {imgError ? (
-              <div className="w-full aspect-square grid place-items-center bg-[#e7eff8] rounded-2xl border-2 border-[#0f2f52]/10 shadow">
-                <Shirt size={64} className="text-gray-400" />
+            <div className="flex flex-col sm:flex-row gap-3">
+              {gallery.length > 1 && (
+                <div className="order-2 sm:order-1 flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible sm:w-20 shrink-0">
+                  {gallery.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => { setActiveImage(image); setImgError(false); }}
+                      aria-label={`عرض الصورة ${index + 1}`}
+                      aria-pressed={activeImage === image}
+                      className={`w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden bg-white border-2 transition-all ${activeImage === image ? 'border-[#1565c0] ring-2 ring-[#2f9de4]/40' : 'border-[#0f2f52]/10 hover:border-[#2f9de4]'}`}
+                    >
+                      <img
+                        src={image}
+                        alt={`${p.name_ar} - صورة ${index + 1}`}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                        onError={(event) => { event.currentTarget.src = p.image; }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="order-1 sm:order-2 flex-1 min-w-0">
+                {imgError ? (
+                  <div className="w-full aspect-square grid place-items-center bg-[#e7eff8] rounded-2xl border-2 border-[#0f2f52]/10 shadow">
+                    <Shirt size={64} className="text-gray-400" />
+                  </div>
+                ) : (
+                  <img
+                    src={activeImage}
+                    alt={p.name_ar}
+                    loading="lazy"
+                    decoding="async"
+                    width={640}
+                    height={640}
+                    onError={() => setImgError(true)}
+                    className="w-full aspect-square object-cover rounded-2xl border-2 border-[#0f2f52]/10 shadow"
+                  />
+                )}
               </div>
-            ) : (
-              <img
-                src={p.image}
-                alt={p.name_ar}
-                loading="lazy"
-                decoding="async"
-                width={640}
-                height={640}
-                onError={() => setImgError(true)}
-                className="w-full aspect-square object-cover rounded-2xl border-2 border-[#0f2f52]/10 shadow"
-              />
-            )}
+            </div>
             <div className="absolute top-6 right-6 md:top-8 md:right-8 flex flex-col gap-1.5">
               {p.badge && <span className="bg-[#1565c0] text-white text-[11px] font-black px-3 py-1 rounded-full shadow">{p.badge}</span>}
               {discount > 0 && <span className="bg-[#2f9de4] text-[#0f2f52] text-[11px] font-black px-3 py-1 rounded-full shadow">خصم {discount}%</span>}

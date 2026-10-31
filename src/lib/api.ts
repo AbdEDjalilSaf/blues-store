@@ -7,6 +7,8 @@ export interface Product {
   price: number;
   old_price?: number | null;
   image: string;
+  /** All loadable product images, ordered with the primary image first. */
+  imageGallery?: string[];
   sizes: string;
   condition: string;
   rarity: string;
@@ -179,10 +181,15 @@ function eraFromYear(year: number): string {
 /** Map an API row onto the shape the storefront components already speak. */
 export function mapApiProduct(raw: ApiProduct, index: number): Product {
   const images = Array.isArray(raw.images) ? raw.images : [];
-  const primary =
-    images.find((img) => img.is_primary) ??
-    [...images].sort((a, b) => a.sort_order - b.sort_order)[0];
-  const resolved = resolveApiImage(primary);
+  const orderedImages = [
+    ...images.filter((img) => img.is_primary),
+    ...images.filter((img) => !img.is_primary).sort((a, b) => a.sort_order - b.sort_order),
+  ];
+  const imageGallery = orderedImages
+    .map((img) => resolveApiImage(img))
+    .filter((url, position, all) => Boolean(url) && all.indexOf(url) === position);
+  const resolved = imageGallery[0] ?? '';
+  const fallback = fallbackImage(raw.team);
   const stock = Number(raw.stock) || 0;
 
   return {
@@ -193,7 +200,8 @@ export function mapApiProduct(raw: ApiProduct, index: number): Product {
     era: eraFromYear(raw.year),
     price: Number(raw.price) || 0,
     old_price: raw.old_price != null ? Number(raw.old_price) : null,
-    image: resolved || fallbackImage(raw.team),
+    image: resolved || fallback,
+    imageGallery: imageGallery.length > 0 ? imageGallery : [fallback],
     sizes: raw.size?.trim() ? raw.size : 'M,L,XL',
     condition: 'ممتاز',
     rarity: stock <= 2 ? 'نادر' : stock <= 5 ? 'محدود' : 'متوفر',
